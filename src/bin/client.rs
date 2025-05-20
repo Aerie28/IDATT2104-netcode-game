@@ -14,7 +14,7 @@ fn main() {
     let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
 
     // Hold styr på forrige status for hver relevant tast
-    let keys = [Key::Up, Key::Down, Key::Left, Key::Right];
+    let keys = [Key::W, Key::A, Key::S, Key::D];
     let mut prev_keys: HashMap<Key, bool> = keys.iter().map(|&k| (k, false)).collect();
 
     while renderer.window.is_open() {
@@ -25,10 +25,10 @@ fn main() {
             // Sjekk overgang fra ikke-trykket til trykket
             if is_down && !was_down {
                 let dir = match key {
-                    Key::Up => Direction::Up,
-                    Key::Down => Direction::Down,
-                    Key::Left => Direction::Left,
-                    Key::Right => Direction::Right,
+                    Key::W => Direction::Up,
+                    Key::A => Direction::Left,
+                    Key::S => Direction::Down,
+                    Key::D => Direction::Right,
                     _ => continue,
                 };
                 net.send_input(PlayerInput { dir });
