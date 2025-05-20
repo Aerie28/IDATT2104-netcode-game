@@ -109,8 +109,6 @@ async fn main() {
         clear_background(BLACK);
         set_camera(&camera);
 
-        draw_grid(FIELD_WIDTH as u32, 1.0, GRAY, DARKGRAY);
-
         // Draw all players, using predicted position for yourself
         for (addr, (pos, color)) in &all_players {
             let (draw_x, draw_y) = if Some(*addr) == my_addr {
@@ -118,7 +116,7 @@ async fn main() {
             } else {
                 (pos.x as f32, pos.y as f32)
             };
-            
+
             let scaled_x = (draw_x as f32) * FIELD_WIDTH / SERVER_WIDTH;
             let scaled_y = (draw_y as f32) * FIELD_HEIGHT / SERVER_HEIGHT;
 
