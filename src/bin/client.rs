@@ -11,22 +11,31 @@ fn main() {
 
     let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
 
+    // Hold styr på forrige status for hver relevant tast
+    let keys = [Key::Up, Key::Down, Key::Left, Key::Right];
+    let mut prev_keys: HashMap<Key, bool> = keys.iter().map(|&k| (k, false)).collect();
+
     while renderer.window.is_open() {
-        // Input
-        if renderer.window.is_key_down(Key::Up) {
-            net.send_input(PlayerInput { dir: Direction::Up });
-        }
-        if renderer.window.is_key_down(Key::Down) {
-            net.send_input(PlayerInput { dir: Direction::Down });
-        }
-        if renderer.window.is_key_down(Key::Left) {
-            net.send_input(PlayerInput { dir: Direction::Left });
-        }
-        if renderer.window.is_key_down(Key::Right) {
-            net.send_input(PlayerInput { dir: Direction::Right });
+        for &key in &keys {
+            let is_down = renderer.window.is_key_down(key);
+            let was_down = *prev_keys.get(&key).unwrap_or(&false);
+
+            // Sjekk overgang fra ikke-trykket til trykket
+            if is_down && !was_down {
+                let dir = match key {
+                    Key::Up => Direction::Up,
+                    Key::Down => Direction::Down,
+                    Key::Left => Direction::Left,
+                    Key::Right => Direction::Right,
+                    _ => continue,
+                };
+                net.send_input(PlayerInput { dir });
+            }
+
+            prev_keys.insert(key, is_down);
         }
 
-        // Motta ny snapshot
+        // Motta ny snapshot med alle spillere og deres farger
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
             for (addr, pos, color) in snapshot.players {
