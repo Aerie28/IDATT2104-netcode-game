@@ -2,9 +2,9 @@ use macroquad::prelude::*;
 use macroquad::camera::{Camera3D, set_camera};
 use macroquad::window::Conf;
 use macroquad::miniquad::conf::Icon;
-use image::{GenericImageView, imageops::FilterType};
+use image::imageops::FilterType;
 
-fn window_conf() -> macroquad::window::Conf {
+fn window_conf() -> Conf {
     let icon_bytes = include_bytes!("ntnu-logo.png");
     let image = image::load_from_memory(icon_bytes).unwrap();
 
@@ -19,7 +19,7 @@ fn window_conf() -> macroquad::window::Conf {
         big: big.try_into().unwrap(),
     };
 
-    macroquad::window::Conf {
+    Conf {
         window_title: "Netcoding Game".to_string(),
         window_width: 800,
         window_height: 600,
