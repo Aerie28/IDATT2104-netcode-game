@@ -20,7 +20,7 @@ fn window_conf() -> macroquad::window::Conf {
     };
 
     macroquad::window::Conf {
-        window_title: "My Macroquad App".to_string(),
+        window_title: "Netcoding Game".to_string(),
         window_width: 800,
         window_height: 600,
         icon: Some(icon),
