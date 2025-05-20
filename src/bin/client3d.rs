@@ -92,7 +92,7 @@ async fn main() {
         // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
-            for (addr, pos, color) in snapshot.players {
+            for (addr, pos, color, _status) in snapshot.players {
                 if my_addr.is_none() {
                     my_addr = Some(addr);
                     // Set the client address in NetworkClient

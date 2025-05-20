@@ -11,7 +11,7 @@ fn main() {
 
     net.send_connect();
 
-    let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
+    let mut all_players: HashMap<SocketAddr, (Position, u32, bool)> = HashMap::new();
 
     // Hold styr på forrige status for hver relevant tast
     let keys = [Key::W, Key::A, Key::S, Key::D];
@@ -40,16 +40,22 @@ fn main() {
         // Motta ny snapshot med alle spillere og deres farger
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
-            for (addr, pos, color) in snapshot.players {
-                all_players.insert(addr, (pos, color));
+            for (addr, pos, color, active) in snapshot.players {
+                all_players.insert(addr, (pos, color, active));
+            
             }
         }
 
         // Tegn alle spillere med farge
         renderer.clear();
-        for (_addr, (pos, color)) in &all_players {
-            renderer.draw_rect(pos.x as usize, pos.y as usize, 10, 10, *color);
-        }
+    for (_addr, (pos, color, active)) in &all_players {
+        let draw_color = if *active {
+            *color
+        } else {
+            color & 0x7F7F7F // darken the color (strip high bits)
+        };
+        renderer.draw_rect(pos.x as usize, pos.y as usize, 10, 10, draw_color);
+    }
         renderer.update();
     }
     net.send_disconnect();
