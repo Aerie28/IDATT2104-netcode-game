@@ -79,7 +79,7 @@ async fn main() {
 
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
-            for (addr, pos, color) in snapshot.players {
+            for (addr, pos, color, status) in snapshot.players {
                 all_players.insert(addr, (pos, color));
             }
         }

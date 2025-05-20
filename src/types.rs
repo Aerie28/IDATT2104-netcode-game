@@ -29,5 +29,5 @@ pub struct Position {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
-    pub players: Vec<(SocketAddr, Position, u32)>, // addr, pos, color
+    pub players: Vec<(SocketAddr, Position, u32, bool)>, // addr, pos, color, active
 }
