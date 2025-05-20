@@ -8,7 +8,7 @@ use rand::Rng;
 use tokio::time;
 
 use bincode;
-use netcode_game::types::{PlayerInput, Direction, Position, GameState};
+use netcode_game::types::{ClientMessage, PlayerInput, Direction, Position, GameState};
 
 const TIMEOUT: Duration = Duration::from_secs(30);
 
@@ -41,16 +41,30 @@ async fn main() {
         match socket.recv_from(&mut buf).await {
             Ok((size, addr)) => {
                 let data = &buf[..size];
-                if let Ok(input) = bincode::deserialize::<PlayerInput>(data) {
+                if let Ok(msg) = bincode::deserialize::<ClientMessage>(data) {
                     let mut state = state.lock().await;
 
-                    // Handle player input
-                    handle_input(&mut state, addr, input);
+                    match msg {
+                        ClientMessage::Connect => {
+                            let mut rng = rand::rng();
+                            let x = rng.random_range(0..640); // assuming 640x480 game area
+                            let y = rng.random_range(0..480);
+                            state.entry(addr).or_insert_with(|| {
+                                let color = rand::rng().random_range(0x100000..0xFFFFFF);
+                                (Position { x, y }, color, Instant::now(), true)
+                            });
+                        }
+                        ClientMessage::Input(input) => {
+                            handle_input(&mut state, addr, input);
+                        }
+                        ClientMessage::Disconnect => {
+                            // Mark player as inactive or remove from state
+                            state.remove(&addr);
+                            println!("Client {} disconnected", addr);
+                        }
+                    }
 
-                    // Update inactive players
                     update_inactive(&mut state);
-
-                    // Build and broadcast snapshot
                     let snapshot = build_snapshot(&state);
                     let num_players = snapshot.players.len();
                     println!("Input: Sending snapshot to {} clients", num_players);

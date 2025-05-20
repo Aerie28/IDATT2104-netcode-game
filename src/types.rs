@@ -1,6 +1,13 @@
 use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 
+
+#[derive(Serialize, Deserialize, Debug)]
+pub enum ClientMessage {
+    Connect,
+    Input(PlayerInput),
+    Disconnect,
+}
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Direction {
     Up,

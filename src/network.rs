@@ -1,4 +1,4 @@
-use crate::types::{PlayerInput, GameState};
+use crate::types::{ClientMessage, PlayerInput, GameState};
 use std::net::{ UdpSocket};
 use bincode;
 
@@ -16,9 +16,20 @@ impl NetworkClient {
             server_addr: server_addr.to_string(),
         }
     }
+    pub fn send_connect(&self) {
+        let msg = ClientMessage::Connect;
+        let data = bincode::serialize(&msg).unwrap();
+        let _ = self.socket.send_to(&data, &self.server_addr);
+    }
+    pub fn send_disconnect(&self) {
+        let msg = ClientMessage::Disconnect;
+        let data = bincode::serialize(&msg).unwrap();
+        let _ = self.socket.send_to(&data, &self.server_addr);
+    }
 
     pub fn send_input(&self, input: PlayerInput) {
-        let data = bincode::serialize(&input).unwrap();
+        let msg = ClientMessage::Input(input);
+        let data = bincode::serialize(&msg).unwrap();
         let _ = self.socket.send_to(&data, &self.server_addr);
     }
 

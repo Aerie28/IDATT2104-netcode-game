@@ -9,6 +9,8 @@ fn main() {
     let mut renderer = Renderer::new(640, 480);
     let net = NetworkClient::new("127.0.0.1:9000");
 
+    net.send_connect();
+
     let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
 
     // Hold styr på forrige status for hver relevant tast
@@ -50,4 +52,5 @@ fn main() {
         }
         renderer.update();
     }
+    net.send_disconnect();
 }
