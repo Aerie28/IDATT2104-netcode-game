@@ -8,7 +8,7 @@ pub enum ClientMessage {
     Input(PlayerInput),
     Disconnect,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub enum Direction {
     Up,
     Down,
@@ -16,7 +16,7 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct PlayerInput {
     pub dir: Direction,
 }
