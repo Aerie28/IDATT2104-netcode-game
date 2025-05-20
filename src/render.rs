@@ -25,8 +25,11 @@ impl Renderer {
     pub fn draw_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: u32) {
         for dy in 0..h {
             for dx in 0..w {
-                let px = (y + dy) * self.width + (x + dx);
-                if px < self.buffer.len() {
+                let px_x = x + dx;
+                let px_y = y + dy;
+
+                if px_x < self.width && px_y < self.height {
+                    let px = px_y * self.width + px_x;
                     self.buffer[px] = color;
                 }
             }
