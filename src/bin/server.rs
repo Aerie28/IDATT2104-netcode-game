@@ -122,3 +122,58 @@ async fn broadcast_snapshot(
         let _ = socket.send_to(&payload, client_addr).await;
     }
 }
+
+//TESTING
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::SocketAddr;
+    use std::str::FromStr;
+    use std::time::{Instant, Duration};
+    use std::collections::HashMap;
+    use netcode_game::types::Position;
+
+    #[test]
+    fn test_handle_input_movement() {
+        use netcode_game::types::{Direction, PlayerInput};
+
+  
+        let addr = SocketAddr::from_str("127.0.0.1:12345").unwrap();
+        let input = PlayerInput { dir: Direction::Right };
+        let mut state: HashMap<SocketAddr, (Position, u32, Instant, bool)> = HashMap::new();
+
+        // Start at center
+        state.insert(addr, (Position { x: 320, y: 240 }, 0xABCDEF, Instant::now(), true));
+
+        handle_input(&mut state, addr, input);
+
+        assert_eq!(state[&addr].0.x, 325); // moved right by 5
+        assert_eq!(state[&addr].0.y, 240); // unchanged
+    }
+
+    #[test]
+    fn test_update_inactive_marks_inactive() {
+        let addr = SocketAddr::from_str("127.0.0.1:12345").unwrap();
+        let mut state = HashMap::new();
+        state.insert(addr, (Position { x: 0, y: 0 }, 123, Instant::now() - Duration::from_secs(31), true));
+
+      update_inactive(&mut state);
+
+        assert_eq!(state[&addr].3, false); // active flag should be false
+    }
+    #[test]
+    fn test_build_snapshot_filters_inactive() {
+        let mut state = HashMap::new();
+        let active_addr = SocketAddr::from_str("127.0.0.1:1").unwrap();
+        let inactive_addr = SocketAddr::from_str("127.0.0.1:2").unwrap();
+
+        state.insert(active_addr, (Position { x: 10, y: 10 }, 111, Instant::now(), true));
+        state.insert(inactive_addr, (Position { x: 20, y: 20 }, 222, Instant::now(), false));
+
+        let snapshot = super::build_snapshot(&state);
+
+        assert_eq!(snapshot.players.len(), 1);
+        assert!(snapshot.players.iter().any(|(addr, _, _)| *addr == active_addr));
+    }
+}
