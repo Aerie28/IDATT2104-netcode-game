@@ -30,7 +30,7 @@ fn window_conf() -> Conf {
     };
 
     Conf {
-        window_title: "Netcoding Game".to_string(),
+        window_title: "Netcode Game".to_string(),
         window_width: 800,
         window_height: 600,
         icon: Some(icon),
@@ -41,7 +41,7 @@ fn window_conf() -> Conf {
 #[macroquad::main(window_conf)]
 async fn main() {
     let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
-    let net = NetworkClient::new("127.0.0.1:9000");
+    let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
 
     let mut prev_keys = HashMap::from([
@@ -59,7 +59,11 @@ async fn main() {
         ..Default::default()
     };
 
+    let mut my_addr: Option<SocketAddr> = None;
+    let mut my_pos: Position = Position { x: 320, y: 240 };
+
     loop {
+        // Input handling and prediction
         for &key in &[KeyCode::W, KeyCode::A, KeyCode::S, KeyCode::D] {
             let is_down = is_key_down(key);
             let was_down = *prev_keys.get(&key).unwrap_or(&false);
@@ -67,19 +71,37 @@ async fn main() {
             if is_down && !was_down {
                 let dir = match key {
                     KeyCode::W => Direction::Up,
-                    KeyCode::S => Direction::Down,
                     KeyCode::A => Direction::Left,
+                    KeyCode::S => Direction::Down,
                     KeyCode::D => Direction::Right,
                     _ => continue,
                 };
-                net.send_input(PlayerInput { dir });
+                net.send_input(PlayerInput { dir }); // dir is Copy, so it's fine
+
+                // Predict movement
+                match dir {
+                    Direction::Up => my_pos.y = my_pos.y.saturating_sub(5),
+                    Direction::Down => my_pos.y = my_pos.y.saturating_add(5),
+                    Direction::Left => my_pos.x = my_pos.x.saturating_sub(5),
+                    Direction::Right => my_pos.x = my_pos.x.saturating_add(5),
+                }
             }
             prev_keys.insert(key, is_down);
         }
 
+        // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
             for (addr, pos, color) in snapshot.players {
+                if my_addr.is_none() {
+                    my_addr = Some(addr);
+                    // Set the client address in NetworkClient
+                    // You need net to be mutable for this, so declare it as `let mut net = ...` at the top
+                    net.set_client_addr(addr);
+                    my_pos = pos;
+                } else if Some(addr) == my_addr {
+                    my_pos = pos;
+                }
                 all_players.insert(addr, (pos, color));
             }
         }
@@ -87,13 +109,18 @@ async fn main() {
         clear_background(BLACK);
         set_camera(&camera);
 
-        // Draw ground grid with your scaled FIELD_WIDTH and FIELD_HEIGHT
         draw_grid(FIELD_WIDTH as u32, 1.0, GRAY, DARKGRAY);
 
-        // Draw all players as cubes with position scaled from server coords to FIELD coords
-        for (_addr, (pos, color)) in &all_players {
-            let scaled_x = (pos.x as f32) * FIELD_WIDTH / SERVER_WIDTH;
-            let scaled_y = (pos.y as f32) * FIELD_HEIGHT / SERVER_HEIGHT;
+        // Draw all players, using predicted position for yourself
+        for (addr, (pos, color)) in &all_players {
+            let (draw_x, draw_y) = if Some(*addr) == my_addr {
+                (my_pos.x as f32, my_pos.y as f32)
+            } else {
+                (pos.x as f32, pos.y as f32)
+            };
+            
+            let scaled_x = (draw_x as f32) * FIELD_WIDTH / SERVER_WIDTH;
+            let scaled_y = (draw_y as f32) * FIELD_HEIGHT / SERVER_HEIGHT;
 
             let color = Color::from_rgba(
                 ((*color >> 16) & 0xFF) as u8,
