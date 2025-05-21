@@ -1,11 +1,9 @@
 use macroquad::prelude::*;
 use macroquad::camera::{Camera3D, set_camera};
-use macroquad::window::Conf;
-use macroquad::miniquad::conf::Icon;
-use image::imageops::FilterType;
 use std::collections::HashMap;
 use netcode_game::network::NetworkClient;
 use netcode_game::types::{PlayerInput, Direction, Position};
+use netcode_game::config::config_window;
 use std::net::SocketAddr;
 
 const FIELD_WIDTH: f32 = 64.0;
@@ -15,30 +13,7 @@ const FIELD_HEIGHT: f32 = 48.0;
 const SERVER_WIDTH: f32 = 640.0;
 const SERVER_HEIGHT: f32 = 480.0;
 
-fn window_conf() -> Conf {
-    let icon_bytes = include_bytes!("icon.png");
-    let image = image::load_from_memory(icon_bytes).unwrap();
-
-    let small = image.resize_exact(16, 16, FilterType::Lanczos3).into_rgba8().into_raw();
-    let medium = image.resize_exact(32, 32, FilterType::Lanczos3).into_rgba8().into_raw();
-    let big = image.resize_exact(64, 64, FilterType::Lanczos3).into_rgba8().into_raw();
-
-    let icon = Icon {
-        small: small.try_into().unwrap(),
-        medium: medium.try_into().unwrap(),
-        big: big.try_into().unwrap(),
-    };
-
-    Conf {
-        window_title: "Netcode Game".to_string(),
-        window_width: 800,
-        window_height: 600,
-        icon: Some(icon),
-        ..Default::default()
-    }
-}
-
-#[macroquad::main(window_conf)]
+#[macroquad::main(config_window)]
 async fn main() {
     let mut all_players: HashMap<SocketAddr, (Position, u32, bool)> = HashMap::new();
     let mut net = NetworkClient::new("127.0.0.1:9000");
