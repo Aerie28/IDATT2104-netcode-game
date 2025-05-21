@@ -1,11 +1,11 @@
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    time::{Duration, Instant},
+    time::Instant,
 };
+use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-
-const TIMEOUT: Duration = Duration::from_secs(30);
+use crate::constants::TIMEOUT;
 
 /// Stores state for one player
 pub struct PlayerState {
@@ -39,7 +39,14 @@ impl Game {
         let mut rng = rand::rng();
         let x = rng.random_range(0..640);
         let y = rng.random_range(0..480);
-        let color = rng.random_range(0x100000..0xFFFFFF);
+        
+        // Pick a color from the palette randomly
+        let palette = player_colors::get_palette();
+        let color_base = palette[rng.random_range(0..palette.len())];
+        // Pack the color as u32 for serialization
+        let color = ((color_base.r * 255.0) as u32) << 16
+            | ((color_base.g * 255.0) as u32) << 8
+            | ((color_base.b * 255.0) as u32);
 
         self.players.insert(
             addr,
