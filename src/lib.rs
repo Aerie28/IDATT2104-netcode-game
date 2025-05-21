@@ -5,3 +5,4 @@ pub mod game;
 pub mod config;
 pub mod input;
 pub mod colors;
+pub mod constants;

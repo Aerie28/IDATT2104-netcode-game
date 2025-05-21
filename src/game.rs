@@ -5,8 +5,7 @@ use std::{
 };
 use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-
-const TIMEOUT: Duration = Duration::from_secs(30);
+use crate::constants::TIMEOUT;
 
 /// Stores state for one player
 pub struct PlayerState {

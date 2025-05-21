@@ -9,10 +9,9 @@ use tokio::time;
 use bincode;
 
 use netcode_game::game::Game;
-
 use netcode_game::types::{ClientMessage, GameState};
+use netcode_game::constants::BROADCAST_INTERVAL;
 
-const BROADCAST_INTERVAL: Duration = Duration::from_secs(20);
 
 #[tokio::main]
 async fn main() {

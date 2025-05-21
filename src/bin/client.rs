@@ -5,14 +5,8 @@ use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
 use netcode_game::types::{Position};
 use netcode_game::config::config_window;
+use netcode_game::constants::{ FIELD_WIDTH, FIELD_HEIGHT, SERVER_WIDTH, SERVER_HEIGHT };
 use std::net::SocketAddr;
-
-const FIELD_WIDTH: f32 = 64.0;
-const FIELD_HEIGHT: f32 = 48.0;
-
-// These represent the server's coordinate system dimensions
-const SERVER_WIDTH: f32 = 640.0;
-const SERVER_HEIGHT: f32 = 480.0;
 
 #[macroquad::main(config_window)]
 async fn main() {

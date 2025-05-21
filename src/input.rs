@@ -2,11 +2,7 @@ use macroquad::prelude::*;
 use std::collections::HashMap;
 use crate::types::{PlayerInput, Direction, Position};
 use crate::network::NetworkClient;
-
-const INITIAL_DELAY: f32 = 0.35;
-const REPEAT_START: f32 = 0.15;
-const REPEAT_MIN: f32 = 0.05;
-const REPEAT_ACCEL: f32 = 0.90;
+use crate::constants::{ INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL };
 
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
