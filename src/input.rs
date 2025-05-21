@@ -2,7 +2,7 @@ use macroquad::prelude::*;
 use std::collections::HashMap;
 use crate::types::{PlayerInput, Direction, Position};
 use crate::network::NetworkClient;
-use crate::constants::{ INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL };
+use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED};
 
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
@@ -45,10 +45,10 @@ impl InputHandler {
 
                 // Predict movement
                 match dir {
-                    Direction::Up => my_pos.y = my_pos.y.saturating_sub(5),
-                    Direction::Down => my_pos.y = my_pos.y.saturating_add(5),
-                    Direction::Left => my_pos.x = my_pos.x.saturating_sub(5),
-                    Direction::Right => my_pos.x = my_pos.x.saturating_add(5),
+                    Direction::Up => my_pos.y = my_pos.y.saturating_sub(PLAYER_SPEED),
+                    Direction::Down => my_pos.y = my_pos.y.saturating_add(PLAYER_SPEED),
+                    Direction::Left => my_pos.x = my_pos.x.saturating_sub(PLAYER_SPEED),
+                    Direction::Right => my_pos.x = my_pos.x.saturating_add(PLAYER_SPEED),
                 }
             } else if is_down && was_down {
                 // Key is still down, update timer
@@ -72,10 +72,10 @@ impl InputHandler {
 
                     // Predict movement
                     match dir {
-                        Direction::Up => my_pos.y = my_pos.y.saturating_sub(5),
-                        Direction::Down => my_pos.y = my_pos.y.saturating_add(5),
-                        Direction::Left => my_pos.x = my_pos.x.saturating_sub(5),
-                        Direction::Right => my_pos.x = my_pos.x.saturating_add(5),
+                        Direction::Up => my_pos.y = my_pos.y.saturating_sub(PLAYER_SPEED),
+                        Direction::Down => my_pos.y = my_pos.y.saturating_add(PLAYER_SPEED),
+                        Direction::Left => my_pos.x = my_pos.x.saturating_sub(PLAYER_SPEED),
+                        Direction::Right => my_pos.x = my_pos.x.saturating_add(PLAYER_SPEED),
                     }
                 }
             } else if !is_down && was_down {

@@ -5,7 +5,7 @@ use std::{
 };
 use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-use crate::constants::TIMEOUT;
+use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT};
 
 /// Stores state for one player
 pub struct PlayerState {
@@ -37,8 +37,8 @@ impl Game {
         }
 
         let mut rng = rand::rng();
-        let x = rng.random_range(0..640);
-        let y = rng.random_range(0..480);
+        let x = rng.random_range(0..(BOARD_WIDTH as i32));
+        let y = rng.random_range(0..(BOARD_HEIGHT as i32));
         
         // Pick a color from the palette randomly
         let palette = player_colors::get_palette();
@@ -66,10 +66,10 @@ impl Game {
             player.active = true;
 
             match input.dir {
-                Direction::Up => player.position.y = player.position.y.saturating_sub(5),
-                Direction::Down => player.position.y = player.position.y.saturating_add(5),
-                Direction::Left => player.position.x = player.position.x.saturating_sub(5),
-                Direction::Right => player.position.x = player.position.x.saturating_add(5),
+                Direction::Up => player.position.y = player.position.y.saturating_sub(PLAYER_SPEED),
+                Direction::Down => player.position.y = player.position.y.saturating_add(PLAYER_SPEED),
+                Direction::Left => player.position.x = player.position.x.saturating_sub(PLAYER_SPEED),
+                Direction::Right => player.position.x = player.position.x.saturating_add(PLAYER_SPEED),
             }
         }
     }
