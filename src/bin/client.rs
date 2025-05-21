@@ -21,6 +21,11 @@ async fn main() {
     let mut my_pos: Position = Position { x: 320, y: 240 };
     
     loop {
+        if is_key_pressed(KeyCode::Escape) {
+            net.send_disconnect(); // <- your custom method to inform the server
+            break; // exit the loop
+        }
+        
         // Handle key input
         let dt = get_frame_time();
         input_handler.handle_input(&mut my_pos, &mut net, dt);

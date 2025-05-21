@@ -7,6 +7,8 @@ use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PL
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
     key_states: HashMap<KeyCode, bool>,
+    input_seq: u32,
+    pending_inputs: Vec<PlayerInput>,
 }
 
 impl InputHandler {
@@ -14,6 +16,8 @@ impl InputHandler {
         InputHandler {
             key_timers: HashMap::new(),
             key_states: HashMap::new(),
+            input_seq: 0,
+            pending_inputs: Vec::new(),
         }
     }
 
@@ -41,7 +45,11 @@ impl InputHandler {
                     KeyCode::D => Direction::Right,
                     _ => continue,
                 };
-                net.send_input(PlayerInput { dir });
+                net.send_input(PlayerInput { 
+                    dir,
+                seq: self.input_seq, 
+                });
+                self.input_seq += 1;
 
                 // Predict movement
                 match dir {
@@ -68,7 +76,11 @@ impl InputHandler {
                         KeyCode::D => Direction::Right,
                         _ => continue,
                     };
-                    net.send_input(PlayerInput { dir });
+                    net.send_input(PlayerInput {
+                        dir,
+                        seq: self.input_seq,
+                    });
+                    self.input_seq += 1;
 
                     // Predict movement
                     match dir {

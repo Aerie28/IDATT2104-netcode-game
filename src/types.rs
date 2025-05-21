@@ -19,6 +19,7 @@ pub enum Direction {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct PlayerInput {
     pub dir: Direction,
+    pub seq: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
