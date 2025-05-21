@@ -16,7 +16,7 @@ const SERVER_WIDTH: f32 = 640.0;
 const SERVER_HEIGHT: f32 = 480.0;
 
 fn window_conf() -> Conf {
-    let icon_bytes = include_bytes!("ntnu-logo.png");
+    let icon_bytes = include_bytes!("icon.png");
     let image = image::load_from_memory(icon_bytes).unwrap();
 
     let small = image.resize_exact(16, 16, FilterType::Lanczos3).into_rgba8().into_raw();
