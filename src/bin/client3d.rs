@@ -40,7 +40,7 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut all_players: HashMap<SocketAddr, (Position, u32)> = HashMap::new();
+    let mut all_players: HashMap<SocketAddr, (Position, u32, bool)> = HashMap::new();
     let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
 
@@ -92,17 +92,15 @@ async fn main() {
         // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
-            for (addr, pos, color, _status) in snapshot.players {
+            for (addr, pos, color, active) in snapshot.players {
                 if my_addr.is_none() {
                     my_addr = Some(addr);
-                    // Set the client address in NetworkClient
-                    // You need net to be mutable for this, so declare it as `let mut net = ...` at the top
                     net.set_client_addr(addr);
                     my_pos = pos;
                 } else if Some(addr) == my_addr {
                     my_pos = pos;
                 }
-                all_players.insert(addr, (pos, color));
+                all_players.insert(addr, (pos, color, active));
             }
         }
 
@@ -110,7 +108,7 @@ async fn main() {
         set_camera(&camera);
 
         // Draw all players, using predicted position for yourself
-        for (addr, (pos, color)) in &all_players {
+        for (addr, (pos, color, active)) in &all_players {
             let (draw_x, draw_y) = if Some(*addr) == my_addr {
                 (my_pos.x as f32, my_pos.y as f32)
             } else {
@@ -120,10 +118,16 @@ async fn main() {
             let scaled_x = (draw_x as f32) * FIELD_WIDTH / SERVER_WIDTH;
             let scaled_y = (draw_y as f32) * FIELD_HEIGHT / SERVER_HEIGHT;
 
+            let draw_color = if *active {
+                *color
+            } else {
+                color & 0x7F7F7F // darken the color
+            };
+
             let color = Color::from_rgba(
-                ((*color >> 16) & 0xFF) as u8,
-                ((*color >> 8) & 0xFF) as u8,
-                (*color & 0xFF) as u8,
+                ((draw_color >> 16) & 0xFF) as u8,
+                ((draw_color >> 8) & 0xFF) as u8,
+                (draw_color & 0xFF) as u8,
                 255,
             );
             draw_cube(
