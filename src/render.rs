@@ -1,42 +1,31 @@
-use minifb::{ Window, WindowOptions};
+use macroquad::prelude::*;
 
-
-pub struct Renderer {
-    pub window: Window,
-    buffer: Vec<u32>,
-    width: usize,
-    height: usize,
-}
+pub struct Renderer;
 
 impl Renderer {
-    pub fn new(width: usize, height: usize) -> Self {
-        Self {
-            window: Window::new("Netcode Game", width, height, WindowOptions::default()).unwrap(),
-            buffer: vec![0; width * height],
-            width,
-            height,
-        }
+    pub fn new() -> Self {
+        Renderer
     }
 
-    pub fn clear(&mut self) {
-        self.buffer.iter_mut().for_each(|p| *p = 0x000000);
+    pub fn clear(&self) {
+        clear_background(DARKGRAY);
     }
 
-    pub fn draw_rect(&mut self, x: usize, y: usize, w: usize, h: usize, color: u32) {
-        for dy in 0..h {
-            for dx in 0..w {
-                let px_x = x + dx;
-                let px_y = y + dy;
-
-                if px_x < self.width && px_y < self.height {
-                    let px = px_y * self.width + px_x;
-                    self.buffer[px] = color;
-                }
-            }
-        }
+    pub fn set_camera(&self, camera: &Camera3D) {
+        set_camera(camera);
     }
 
-    pub fn update(&mut self) {
-        self.window.update_with_buffer(&self.buffer, self.width, self.height).unwrap();
+    pub fn draw_player(
+        &self,
+        x: f32,
+        y: f32,
+        color: Color,
+    ) {
+        draw_cube(
+            vec3(x, 0.5, y),
+            vec3(1., 1., 1.),
+            None,
+            color,
+        );
     }
 }

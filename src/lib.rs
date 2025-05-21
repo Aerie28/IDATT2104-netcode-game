@@ -3,3 +3,4 @@ pub mod render;
 pub mod types;
 pub mod game;
 pub mod config;
+pub mod input;

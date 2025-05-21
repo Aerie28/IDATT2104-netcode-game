@@ -28,6 +28,12 @@ pub struct Position {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct Board {
+    pub width: usize,
+    pub height: usize,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
     pub players: Vec<(SocketAddr, Position, u32, bool)>, // addr, pos, color, active
 }

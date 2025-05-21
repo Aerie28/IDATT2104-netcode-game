@@ -1,8 +1,10 @@
 use macroquad::prelude::*;
-use macroquad::camera::{Camera3D, set_camera};
+use macroquad::camera::{Camera3D};
 use std::collections::HashMap;
+use netcode_game::render::Renderer;
+use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
-use netcode_game::types::{PlayerInput, Direction, Position};
+use netcode_game::types::{Position};
 use netcode_game::config::config_window;
 use std::net::SocketAddr;
 
@@ -18,13 +20,11 @@ async fn main() {
     let mut all_players: HashMap<SocketAddr, (Position, u32, bool)> = HashMap::new();
     let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
-
-    let mut prev_keys = HashMap::from([
-        (KeyCode::W, false),
-        (KeyCode::A, false),
-        (KeyCode::S, false),
-        (KeyCode::D, false),
-    ]);
+    
+    // Initialize helpers
+    let renderer = Renderer::new();
+    let mut input_handler = InputHandler::new();
+    
 
     // Camera centered above the scaled playfield, looking down
     let camera = Camera3D {
@@ -36,33 +36,12 @@ async fn main() {
 
     let mut my_addr: Option<SocketAddr> = None;
     let mut my_pos: Position = Position { x: 320, y: 240 };
-
+    
     loop {
-        // Input handling and prediction
-        for &key in &[KeyCode::W, KeyCode::A, KeyCode::S, KeyCode::D] {
-            let is_down = is_key_down(key);
-            let was_down = *prev_keys.get(&key).unwrap_or(&false);
-
-            if is_down && !was_down {
-                let dir = match key {
-                    KeyCode::W => Direction::Up,
-                    KeyCode::A => Direction::Left,
-                    KeyCode::S => Direction::Down,
-                    KeyCode::D => Direction::Right,
-                    _ => continue,
-                };
-                net.send_input(PlayerInput { dir }); // dir is Copy, so it's fine
-
-                // Predict movement
-                match dir {
-                    Direction::Up => my_pos.y = my_pos.y.saturating_sub(5),
-                    Direction::Down => my_pos.y = my_pos.y.saturating_add(5),
-                    Direction::Left => my_pos.x = my_pos.x.saturating_sub(5),
-                    Direction::Right => my_pos.x = my_pos.x.saturating_add(5),
-                }
-            }
-            prev_keys.insert(key, is_down);
-        }
+        // Handle key input
+        let dt = get_frame_time();
+        input_handler.handle_input(&mut my_pos, &mut net, dt);
+        
 
         // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
@@ -79,8 +58,8 @@ async fn main() {
             }
         }
 
-        clear_background(BLACK);
-        set_camera(&camera);
+        renderer.clear();
+        renderer.set_camera(&camera);
 
         // Draw all players, using predicted position for yourself
         for (addr, (pos, color, active)) in &all_players {
@@ -90,13 +69,13 @@ async fn main() {
                 (pos.x as f32, pos.y as f32)
             };
 
-            let scaled_x = (draw_x as f32) * FIELD_WIDTH / SERVER_WIDTH;
-            let scaled_y = (draw_y as f32) * FIELD_HEIGHT / SERVER_HEIGHT;
+            let scaled_x = (draw_x) * FIELD_WIDTH / SERVER_WIDTH;
+            let scaled_y = (draw_y) * FIELD_HEIGHT / SERVER_HEIGHT;
 
             let draw_color = if *active {
                 *color
             } else {
-                color & 0x7F7F7F // darken the color
+                color & 0x7F7F7F
             };
 
             let color = Color::from_rgba(
@@ -105,14 +84,9 @@ async fn main() {
                 (draw_color & 0xFF) as u8,
                 255,
             );
-            draw_cube(
-                vec3(scaled_x, 0.5, scaled_y),
-                vec3(1., 1., 1.),
-                None,
-                color,
-            );
-        }
 
+            renderer.draw_player(scaled_x, scaled_y, color);
+        }
         next_frame().await;
     }
 }
