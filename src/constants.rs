@@ -14,6 +14,11 @@ pub const PLAYER_SPEED: i32 = 5;
 /// Constants for server
 pub const BROADCAST_INTERVAL: Duration = Duration::from_secs(20);
 
+/// Constants for network
+
+pub const DELAY_MS: i32 = 100;
+pub const PACKET_LOSS: i32 = 10;
+
 /// Constants for inputs from players
 pub const INITIAL_DELAY: f32 = 0.35;
 pub const REPEAT_START: f32 = 0.15;
