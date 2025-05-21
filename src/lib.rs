@@ -4,3 +4,4 @@ pub mod types;
 pub mod game;
 pub mod config;
 pub mod input;
+pub mod colors;

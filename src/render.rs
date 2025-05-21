@@ -1,5 +1,5 @@
 use macroquad::prelude::*;
-
+use crate::colors::bg_colors;
 pub struct Renderer;
 
 impl Renderer {
@@ -8,24 +8,18 @@ impl Renderer {
     }
 
     pub fn clear(&self) {
-        clear_background(DARKGRAY);
+        clear_background(bg_colors::BLACK);
     }
-
-    pub fn set_camera(&self, camera: &Camera3D) {
-        set_camera(camera);
-    }
-
+    
     pub fn draw_player(
         &self,
         x: f32,
         y: f32,
         color: Color,
     ) {
-        draw_cube(
-            vec3(x, 0.5, y),
-            vec3(1., 1., 1.),
-            None,
-            color,
-        );
+        // Draw black border
+        draw_rectangle(x, y, 32.0, 32.0, bg_colors::WHITE);
+        // Draw colored rectangle (slightly larger for border effect)
+        draw_rectangle(x - 2.0, y - 2.0, 36.0, 36.0, color);
     }
 }
