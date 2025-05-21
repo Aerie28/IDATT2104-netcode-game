@@ -24,7 +24,10 @@ async fn main() {
         // Handle key input
         let dt = get_frame_time();
         input_handler.handle_input(&mut my_pos, &mut net, dt);
-        
+        input_handler.handle_selector_input();
+        net.delay_ms = input_handler.delay_ms;
+        net.packet_loss = input_handler.packet_loss;
+
 
         // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
@@ -65,6 +68,8 @@ async fn main() {
 
             renderer.draw_player(draw_x, draw_y, color);
         }
+        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss);
+
         next_frame().await;
     }
 }
