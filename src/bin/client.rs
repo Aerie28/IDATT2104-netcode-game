@@ -5,7 +5,6 @@ use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
 use netcode_game::types::{Position};
 use netcode_game::config::config_window;
-use netcode_game::constants::{ FIELD_WIDTH, FIELD_HEIGHT, SERVER_WIDTH, SERVER_HEIGHT };
 use std::net::SocketAddr;
 
 #[macroquad::main(config_window)]
@@ -52,9 +51,6 @@ async fn main() {
                 (pos.x as f32, pos.y as f32)
             };
 
-            let scaled_x = (draw_x) * FIELD_WIDTH / SERVER_WIDTH;
-            let scaled_y = (draw_y) * FIELD_HEIGHT / SERVER_HEIGHT;
-
             let mut color = Color::from_rgba(
                 ((color >> 16) & 0xFFu32) as u8,
                 ((color >> 8) & 0xFFu32) as u8,
@@ -67,7 +63,7 @@ async fn main() {
                 color = Color::new(color.r * 0.5, color.g * 0.5, color.b * 0.5, 1.0);
             }
 
-            renderer.draw_player(scaled_x, scaled_y, color);
+            renderer.draw_player(draw_x, draw_y, color);
         }
         next_frame().await;
     }

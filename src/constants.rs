@@ -4,14 +4,12 @@ use std::time::Duration;
 pub const TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Constants for the board
-pub const FIELD_WIDTH: f32 = 64.0;
-pub const FIELD_HEIGHT: f32 = 48.0;
-pub const SERVER_WIDTH: f32 = 640.0;
-pub const SERVER_HEIGHT: f32 = 480.0;
+pub const BOARD_WIDTH: f32 = 640.0;
+pub const BOARD_HEIGHT: f32 = 480.0;
 
 /// Constants for the player
-pub const PLAYER_SIZE: f32 = 10.0;
-pub const PLAYER_SPEED: u32 = 5;
+pub const PLAYER_SIZE: f32 = 20.0;
+pub const PLAYER_SPEED: i32 = 5;
 
 /// Constants for server
 pub const BROADCAST_INTERVAL: Duration = Duration::from_secs(20);

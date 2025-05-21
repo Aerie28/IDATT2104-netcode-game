@@ -1,5 +1,6 @@
 use macroquad::prelude::*;
 use crate::colors::bg_colors;
+use crate::constants::{PLAYER_SIZE};
 pub struct Renderer;
 
 impl Renderer {
@@ -17,9 +18,12 @@ impl Renderer {
         y: f32,
         color: Color,
     ) {
-        // Draw black border
-        draw_rectangle(x, y, 32.0, 32.0, bg_colors::WHITE);
-        // Draw colored rectangle (slightly larger for border effect)
-        draw_rectangle(x - 2.0, y - 2.0, 36.0, 36.0, color);
+        draw_rectangle(
+            x - PLAYER_SIZE / 2.0,
+            y - PLAYER_SIZE / 2.0,
+            PLAYER_SIZE,
+            PLAYER_SIZE,
+            color,
+        );
     }
 }
