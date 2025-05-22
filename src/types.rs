@@ -1,10 +1,10 @@
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
     Connect,
+    PlayerId(Uuid),
     Input(PlayerInput),
     Disconnect,
 }
@@ -35,5 +35,5 @@ pub struct Board {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
-    pub players: Vec<(SocketAddr, Position, u32, bool)>, // addr, pos, color, active
+    pub players: Vec<(Uuid, Position, u32, bool)>, // id, pos, color, active
 }

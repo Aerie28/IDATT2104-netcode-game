@@ -1,3 +1,4 @@
+use uuid::Uuid;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -17,23 +18,27 @@ pub struct PlayerState {
 
 pub struct Game {
     players: HashMap<SocketAddr, PlayerState>,
+    id_to_addr: HashMap<Uuid, SocketAddr>,
+    addr_to_id: HashMap<SocketAddr, Uuid>,
 }
 
 impl Game {
     pub fn new() -> Self {
         Self {
             players: HashMap::new(),
+            id_to_addr: HashMap::new(),
+            addr_to_id: HashMap::new(),
         }
         
     }
 
     /// Handles new connection by adding player at random pos/color
-    pub fn connect_player(&mut self, addr: SocketAddr) {
+    pub fn connect_player(&mut self, addr: SocketAddr) -> Uuid {
         use rand::Rng;
 
         if self.players.contains_key(&addr) {
-            // Already connected
-            return;
+            // Player already connected
+            return *self.addr_to_id.get(&addr).unwrap();
         }
 
         let mut rng = rand::rng();
@@ -48,6 +53,11 @@ impl Game {
             | ((color_base.g * 255.0) as u32) << 8
             | ((color_base.b * 255.0) as u32);
 
+        // Store the player ID
+        let id = Uuid::new_v4();
+        self.id_to_addr.insert(id, addr);
+        self.addr_to_id.insert(addr, id);
+
         self.players.insert(
             addr,
             PlayerState {
@@ -57,6 +67,7 @@ impl Game {
                 active: true,
             },
         );
+        id
     }
 
     /// Handle player input and update position + activity
@@ -98,9 +109,11 @@ impl Game {
     /// Build a snapshot of active players for broadcasting
     pub fn build_snapshot(&self) -> GameState {
         let players = self.players.iter()
-            .map(|(addr, p)| (*addr, p.position, p.color, p.active)) // include active
+            .map(|(addr, p)| {
+                let player_id = *self.addr_to_id.get(addr).unwrap();
+                (player_id, p.position, p.color, p.active)
+            })
             .collect();
-
         GameState { players }
     }
     pub fn players(&self) -> &HashMap<SocketAddr, PlayerState> {
