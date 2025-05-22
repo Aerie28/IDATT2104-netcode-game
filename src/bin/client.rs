@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use netcode_game::render::Renderer;
 use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
-use netcode_game::types::{Position};
+use netcode_game::types::{PlayerSnapshot, Position};
 use netcode_game::config::config_window;
 use std::net::SocketAddr;
 
@@ -34,13 +34,13 @@ async fn main() {
         // Receive snapshot and correct position
         if let Some(snapshot) = net.try_receive_snapshot() {
             all_players.clear();
-            for (addr, pos, color, active) in snapshot.players {
+            for PlayerSnapshot { addr, pos, color, active, last_input_seq } in snapshot.players {
                 if my_addr.is_none() {
                     my_addr = Some(addr);
                     net.set_client_addr(addr);
                     my_pos = pos;
                 } else if Some(addr) == my_addr {
-                    my_pos = pos;
+                    input_handler.reconcile(pos, last_input_seq, &mut my_pos);
                 }
                 all_players.insert(addr, (pos, color, active));
             }

@@ -4,7 +4,7 @@ use std::{
     time::Instant,
 };
 use crate::colors::player_colors;
-use crate::types::{Position, PlayerInput, Direction, GameState};
+use crate::types::{Position, PlayerInput, Direction, GameState, PlayerSnapshot};
 use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT};
 
 /// Stores state for one player
@@ -13,6 +13,7 @@ pub struct PlayerState {
     pub color: u32,
     pub last_active: Instant,
     pub active: bool,
+    pub last_input_seq: u32,
 }
 
 pub struct Game {
@@ -55,6 +56,7 @@ impl Game {
                 color,
                 last_active: Instant::now(),
                 active: true,
+                last_input_seq: 0,
             },
         );
     }
@@ -98,7 +100,13 @@ impl Game {
     /// Build a snapshot of active players for broadcasting
     pub fn build_snapshot(&self) -> GameState {
         let players = self.players.iter()
-            .map(|(addr, p)| (*addr, p.position, p.color, p.active)) // include active
+            .map(|(addr, p)| PlayerSnapshot {
+                addr: *addr,
+                pos: p.position,
+                color: p.color,
+                active: p.active,
+                last_input_seq: p.last_input_seq, // Include the sequence number
+            })
             .collect();
 
         GameState { players }
