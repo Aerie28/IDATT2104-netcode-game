@@ -43,6 +43,12 @@ pub struct PlayerSnapshot {
     pub last_input_seq: u32, 
 }
 #[derive(Serialize, Deserialize, Debug)]
+pub struct RemotePlayerState {
+    pub current: Position,
+    pub previous: Position,
+    pub last_update_time: f64,
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
     pub players: Vec<PlayerSnapshot>,
 }

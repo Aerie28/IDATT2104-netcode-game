@@ -3,6 +3,8 @@ use std::time::Duration;
 /// Constants for the game state
 pub const TIMEOUT: Duration = Duration::from_secs(30);
 
+pub const INTERPOLATION_DELAY: f32 = 0.05;
+
 /// Constants for the board
 pub const BOARD_WIDTH: f32 = 640.0;
 pub const BOARD_HEIGHT: f32 = 480.0;
