@@ -56,7 +56,13 @@ async fn main() {
 
                     match msg {
                         ClientMessage::Connect => {
-                            game.connect_player(addr);
+                            let id = game.connect_player(addr);
+                            
+                            let id_msg = ClientMessage::PlayerId(id);
+                            let id_payload = bincode::serialize(&id_msg).unwrap();
+                            let _ = socket.send_to(&id_payload, addr).await;
+                            
+                            println!("Client {} connected with ID {}", addr, id);
                         }
                         ClientMessage::Input(input) => {
                             game.handle_input(addr, input);
@@ -64,6 +70,10 @@ async fn main() {
                         ClientMessage::Disconnect => {
                             game.disconnect_player(&addr);
                             println!("Client {} disconnected", addr);
+                        }
+                        ClientMessage::PlayerId(_) => {
+                            // Ignore PlayerId messages from clients
+                            println!("Received PlayerId message from client {}", addr);
                         }
                     }
 

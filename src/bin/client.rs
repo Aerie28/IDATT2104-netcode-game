@@ -1,15 +1,15 @@
 use macroquad::prelude::*;
+use uuid::Uuid;
 use std::collections::HashMap;
 use netcode_game::render::Renderer;
 use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
 use netcode_game::types::{Position};
 use netcode_game::config::config_window;
-use std::net::SocketAddr;
+use netcode_game::types::{ClientMessage, GameState};
 
 #[macroquad::main(config_window)]
 async fn main() {
-    let mut all_players: HashMap<SocketAddr, (Position, u32, bool)> = HashMap::new();
     let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
     
@@ -17,7 +17,8 @@ async fn main() {
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
 
-    let mut my_addr: Option<SocketAddr> = None;
+    let mut all_players: HashMap<Uuid, (Position, u32, bool)> = HashMap::new();
+    let mut my_id: Option<Uuid> = None;
     let mut my_pos: Position = Position { x: 320, y: 240 };
     
     loop {
@@ -28,27 +29,26 @@ async fn main() {
         net.delay_ms = input_handler.delay_ms;
         net.packet_loss = input_handler.packet_loss;
 
-
-        // Receive snapshot and correct position
-        if let Some(snapshot) = net.try_receive_snapshot() {
-            all_players.clear();
-            for (addr, pos, color, active) in snapshot.players {
-                if my_addr.is_none() {
-                    my_addr = Some(addr);
-                    net.set_client_addr(addr);
-                    my_pos = pos;
-                } else if Some(addr) == my_addr {
-                    my_pos = pos;
+        let mut buf = [0u8; 2048];
+        if let Ok((size, _)) = net.socket.recv_from(&mut buf) {
+            if let Ok(ClientMessage::PlayerId(id)) = bincode::deserialize::<ClientMessage>(&buf[..size]) {
+                my_id = Some(id);
+            } else if let Ok(snapshot) = bincode::deserialize::<GameState>(&buf[..size]) {
+                all_players.clear();
+                for (id, pos, color, active) in snapshot.players {
+                    if Some(id) == my_id {
+                        my_pos = pos;
+                    }
+                    all_players.insert(id, (pos, color, active));
                 }
-                all_players.insert(addr, (pos, color, active));
             }
         }
 
         renderer.clear();
 
         // Draw all players, using predicted position for yourself
-        for (addr, (pos, color, active)) in &all_players {
-            let (draw_x, draw_y) = if Some(*addr) == my_addr {
+        for (id, (pos, color, active)) in &all_players {
+            let (draw_x, draw_y) = if Some(*id) == my_id {
                 (my_pos.x as f32, my_pos.y as f32)
             } else {
                 (pos.x as f32, pos.y as f32)
