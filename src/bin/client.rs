@@ -75,6 +75,11 @@ async fn main() {
 
         // Draw all players with interpolation
         for (id, (pos, color, active)) in all_players.iter() {
+            // Skip inactive players
+            if !active {
+                continue;
+            }
+
             if Some(*id) != my_id {
                 // Get interpolated position for other players
                 if let Some(interpolation) = interpolated_positions.get(id) {

@@ -1,5 +1,4 @@
 use std::collections::VecDeque;
-use std::time::Instant;
 use crate::types::Position;
 use crate::constants::{INTERPOLATION_DELAY, MAX_POSITION_HISTORY, MAX_INTERPOLATION_TIME};
 

@@ -51,13 +51,13 @@ impl Game {
             return *self.addr_to_id.get(&addr).unwrap();
         }
 
-        let mut rng = rand::thread_rng();
-        let x = rng.gen_range(0..(BOARD_WIDTH as i32));
-        let y = rng.gen_range(0..(BOARD_HEIGHT as i32));
+        let mut rng = rand::rng();
+        let x = rng.random_range(0..(BOARD_WIDTH as i32));
+        let y = rng.random_range(0..(BOARD_HEIGHT as i32));
         
         // Pick a color from the palette randomly
         let palette = player_colors::get_palette();
-        let color_base = palette[rng.gen_range(0..palette.len())];
+        let color_base = palette[rng.random_range(0..palette.len())];
         // Pack the color as u32 for serialization
         let color = ((color_base.r * 255.0) as u32) << 16
             | ((color_base.g * 255.0) as u32) << 8

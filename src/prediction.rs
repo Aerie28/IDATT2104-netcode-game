@@ -66,9 +66,8 @@ impl PredictionState {
             }
 
             // If we have a large gap between server and client sequence,
-            // we might have missed some updates. In this case, we should
-            // be more aggressive with reconciliation
-            if server_sequence - self.last_confirmed_sequence > 5 {
+            // or if it's been too long since last reconciliation, be more aggressive
+            if server_sequence - self.last_confirmed_sequence > 5 || time_since_last > 0.5 {
                 // Clear all pending inputs and position history
                 self.pending_inputs.clear();
                 self.position_history.clear();

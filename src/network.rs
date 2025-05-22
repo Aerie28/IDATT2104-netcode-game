@@ -13,7 +13,7 @@ pub struct NetworkClient {
     client_addr: Option<SocketAddr>,
     pub delay_ms: i32,
     pub packet_loss: i32,
-    delayed_packets: VecDeque<(Vec<u8>, Instant, u32)>, // (data, send_time, sequence)
+    delayed_packets: VecDeque<(Vec<u8>, Instant, u32, i32)>, // (data, send_time, sequence, delay)
 }
 
 impl NetworkClient {
@@ -51,9 +51,9 @@ impl NetworkClient {
         
         // Add artificial delay with jitter
         if self.delay_ms > 0 {
-            let jitter = rand::thread_rng().gen_range(-5..=5); // ±5ms jitter
+            let jitter = rand::rng().random_range(-5..=5); // ±5ms jitter
             let delay = (self.delay_ms + jitter).max(0);
-            self.delayed_packets.push_back((data, Instant::now(), input.sequence));
+            self.delayed_packets.push_back((data, Instant::now(), input.sequence, delay));
         } else {
             let _ = self.socket.send_to(&data, &self.server_addr);
         }
@@ -103,7 +103,7 @@ impl NetworkClient {
 
     fn simulate_network_conditions(&self) -> bool {
         // Simulate packet loss
-        rand::thread_rng().gen_bool(self.packet_loss as f64 / 100.0)
+        rand::rng().random_bool(self.packet_loss as f64 / 100.0)
     }
 
     fn process_delayed_packets(&mut self) {
@@ -111,8 +111,8 @@ impl NetworkClient {
         let mut ready_packets: Vec<(Vec<u8>, u32)> = Vec::new();
 
         // Collect all packets that are ready to be sent
-        while let Some((data, send_time, sequence)) = self.delayed_packets.front() {
-            if now.duration_since(*send_time) >= Duration::from_millis(self.delay_ms as u64) {
+        while let Some((data, send_time, sequence, delay)) = self.delayed_packets.front() {
+            if now.duration_since(*send_time) >= Duration::from_millis(*delay as u64) {
                 ready_packets.push((data.clone(), *sequence));
                 self.delayed_packets.pop_front();
             } else {
@@ -122,7 +122,7 @@ impl NetworkClient {
 
         // Shuffle ready packets to simulate out-of-order delivery
         if !ready_packets.is_empty() {
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             ready_packets.shuffle(&mut rng);
 
             // Send packets in shuffled order

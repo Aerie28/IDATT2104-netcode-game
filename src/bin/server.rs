@@ -1,6 +1,5 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::collections::HashMap;
 use std::time::Instant;
 
 use tokio::net::UdpSocket;
@@ -8,7 +7,6 @@ use tokio::sync::Mutex;
 use tokio::time;
 
 use bincode;
-use uuid::Uuid;
 
 use netcode_game::game::Game;
 use netcode_game::types::{ClientMessage, GameState};
@@ -56,8 +54,6 @@ async fn main() {
 
             // Get only active players' addresses
             let active_players = game.active_player_addrs();
-            let num_active = active_players.len();
-            println!("Periodic: Sending snapshot to {} active clients", num_active);
 
             // Send snapshot only to active players
             broadcast_snapshot_to_selected(&socket_clone, &active_players, &game_state).await;
@@ -108,14 +104,15 @@ async fn main() {
                     }
                 }
             }
-            Err(e) => {
-                eprintln!("recv_from error: {:?}", e);
+            Err(_e) => {
+                //eprintln!("recv_from error: {:?}", e);
             }
         }
     }
 }
 
 /// Broadcast snapshot to all active players
+/**
 async fn broadcast_snapshot(
     socket: &UdpSocket,
     players: &std::collections::HashMap<SocketAddr, netcode_game::game::PlayerState>,
@@ -129,6 +126,7 @@ async fn broadcast_snapshot(
         }
     }
 }
+*/
 
 async fn broadcast_snapshot_to_selected(
     socket: &UdpSocket,
