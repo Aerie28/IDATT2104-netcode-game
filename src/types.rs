@@ -8,6 +8,9 @@ pub enum ClientMessage {
     PlayerId(Uuid),
     Input(PlayerInput),
     Disconnect,
+    Ping(u64),  // Client sends timestamp
+    Pong(u64),  // Server echoes timestamp
+    Reconnect(Uuid, Position), // Previous ID and position
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -39,7 +42,7 @@ pub struct Board {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
-    pub players: Vec<(Uuid, Position, u32, bool)>, // id, pos, color, active
+    pub players: Vec<(Uuid, Position, u32)>, // id, pos, color
     pub last_processed: HashMap<Uuid, u32>, // Track inputs
     pub server_timestamp: u64,
 }

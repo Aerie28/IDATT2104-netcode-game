@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 /// Constants for the game state
-pub const TIMEOUT: Duration = Duration::from_secs(30);
+pub const TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Constants for the game state
 pub const INTERPOLATION_DELAY: f32 = 0.016;
@@ -15,11 +15,12 @@ pub const PLAYER_SIZE: f32 = 20.0;
 pub const PLAYER_SPEED: i32 = 5;
 
 /// Constants for server
-pub const BROADCAST_INTERVAL: Duration = Duration::from_millis(16);
+pub const BROADCAST_INTERVAL: Duration = Duration::from_millis(16); // 60fps game state updates
 
 /// Constants for network
 pub const DELAY_MS: i32 = 0;
 pub const PACKET_LOSS: i32 = 0;
+pub const PING_INTERVAL: Duration = Duration::from_secs(1); // 1 second between pings
 
 /// Constants for inputs from players
 pub const INITIAL_DELAY: f32 = 0.15;
@@ -31,5 +32,8 @@ pub const REPEAT_ACCEL: f32 = 0.3;
 pub const MAX_POSITION_HISTORY: usize = 30;
 pub const PREDICTION_ERROR_THRESHOLD: f32 = 5.0;
 pub const MAX_INTERPOLATION_TIME: f32 = 0.1;
+
+/// Constants for player management
+pub const ID_GRACE_PERIOD: Duration = Duration::from_secs(60); // 30 seconds grace period for reconnection
 
 

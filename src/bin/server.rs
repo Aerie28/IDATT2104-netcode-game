@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
@@ -10,7 +10,7 @@ use bincode;
 
 use netcode_game::game::Game;
 use netcode_game::types::{ClientMessage, GameState};
-use netcode_game::constants::BROADCAST_INTERVAL;
+use netcode_game::constants::{BROADCAST_INTERVAL, PING_INTERVAL};
 
 #[tokio::main]
 async fn main() {
@@ -60,6 +60,17 @@ async fn main() {
         }
     });
 
+    // Spawn a task to clean up expired disconnected players
+    let game_clone = game.clone();
+    tokio::spawn(async move {
+        let mut interval = time::interval(PING_INTERVAL); // Use PING_INTERVAL for cleanup
+        loop {
+            interval.tick().await;
+            let mut game = game_clone.lock().await;
+            game.cleanup_disconnected();
+        }
+    });
+
     let mut buf = [0u8; 1024];
 
     loop {
@@ -87,15 +98,64 @@ async fn main() {
                             let state_payload = bincode::serialize(&game_state).unwrap();
                             let _ = socket.send_to(&state_payload, addr).await;
                             
-                            println!("Client {} connected with ID {}", addr, id);
+                            println!("Player {} connected from {}", id, addr);
+                        }
+                        ClientMessage::Reconnect(previous_id, position) => {
+                            // Check if the ID exists and is not currently in use
+                            if let Some(existing_addr) = game.id_to_addr().get(&previous_id) {
+                                if !game.players().contains_key(existing_addr) {
+                                    // ID exists but not in use, allow reconnection
+                                    game.reconnect_player(addr, previous_id, position);
+                                    
+                                    let id_msg = ClientMessage::PlayerId(previous_id);
+                                    let id_payload = bincode::serialize(&id_msg).unwrap();
+                                    let _ = socket.send_to(&id_payload, addr).await;
+                                    
+                                    // Send current game state
+                                    let snapshot = game.build_snapshot();
+                                    let game_state = GameState {
+                                        players: snapshot.players,
+                                        last_processed: snapshot.last_processed,
+                                        server_timestamp: Instant::now().elapsed().as_millis() as u64,
+                                    };
+                                    let state_payload = bincode::serialize(&game_state).unwrap();
+                                    let _ = socket.send_to(&state_payload, addr).await;
+                                    
+                                    println!("Player {} reconnected from {}", previous_id, addr);
+                                } else {
+                                    // ID is in use, treat as new connection
+                                    let id = game.connect_player(addr);
+                                    println!("Previous ID {} in use, assigned new ID {} to {}", previous_id, id, addr);
+                                }
+                            } else {
+                                // ID doesn't exist, treat as new connection
+                                let id = game.connect_player(addr);
+                                println!("Previous ID {} not found, assigned new ID {} to {}", previous_id, id, addr);
+                            }
                         }
                         ClientMessage::Input(input) => {
                             game.handle_input(addr, input);
                             game.update_inactive();
                         }
                         ClientMessage::Disconnect => {
+                            if let Some(id) = game.addr_to_id().get(&addr) {
+                                println!("Player {} disconnected gracefully", id);
+                            }
                             game.disconnect_player(&addr);
-                            println!("Client {} disconnected", addr);
+                        }
+                        ClientMessage::Ping(timestamp) => {
+                            // Echo back the timestamp as a pong
+                            let pong_msg = ClientMessage::Pong(timestamp);
+                            let pong_payload = bincode::serialize(&pong_msg).unwrap();
+                            let _ = socket.send_to(&pong_payload, addr).await;
+                            
+                            // Update player's last active time
+                            if let Some(player) = game.players_mut().get_mut(&addr) {
+                                player.last_active = Instant::now();
+                            }
+                        }
+                        ClientMessage::Pong(_) => {
+                            // Ignore pong messages from clients
                         }
                         ClientMessage::PlayerId(_) => {
                             // Ignore PlayerId messages from clients

@@ -6,7 +6,7 @@ use std::{
 };
 use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT};
+use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, ID_GRACE_PERIOD};
 
 const MAX_POSITION_HISTORY: usize = 60; // Store 1 second of history at 60fps
 
@@ -21,8 +21,14 @@ pub struct PlayerState {
     pub position: Position,
     pub color: u32,
     pub last_active: Instant,
-    pub active: bool,
     pub position_history: Vec<PositionSnapshot>,
+}
+
+/// Stores information about disconnected players
+struct DisconnectedPlayer {
+    position: Position,
+    color: u32,
+    disconnected_at: Instant,
 }
 
 pub struct Game {
@@ -30,6 +36,7 @@ pub struct Game {
     id_to_addr: HashMap<Uuid, SocketAddr>,
     addr_to_id: HashMap<SocketAddr, Uuid>,
     last_processed: HashMap<Uuid, u32>, // Track inputs
+    disconnected_players: HashMap<Uuid, DisconnectedPlayer>, // Track disconnected players
 }
 
 impl Game {
@@ -39,6 +46,7 @@ impl Game {
             id_to_addr: HashMap::new(),
             addr_to_id: HashMap::new(),
             last_processed: HashMap::new(),
+            disconnected_players: HashMap::new(),
         }
     }
 
@@ -81,7 +89,6 @@ impl Game {
                 position: initial_position,
                 color,
                 last_active: Instant::now(),
-                active: true,
                 position_history,
             },
         );
@@ -92,7 +99,6 @@ impl Game {
     pub fn handle_input(&mut self, addr: SocketAddr, input: PlayerInput) {
         if let Some(player) = self.players.get_mut(&addr) {
             player.last_active = Instant::now();
-            player.active = true;
 
             // Update last processed input
             if let Some(id) = self.addr_to_id.get(&addr) {
@@ -185,22 +191,79 @@ impl Game {
     /// Marks players inactive if timeout exceeded
     pub fn update_inactive(&mut self) {
         let now = Instant::now();
-        for player in self.players.values_mut() {
+        let mut to_disconnect = Vec::new();
+        
+        // Check for players that haven't sent a ping in TIMEOUT duration
+        for (addr, player) in self.players.iter() {
             if now.duration_since(player.last_active) >= TIMEOUT {
-                player.active = false;
+                to_disconnect.push(*addr);
             }
         }
+        
+        // Disconnect inactive players
+        for addr in to_disconnect {
+            if let Some(id) = self.addr_to_id.get(&addr) {
+                println!("Player {} disconnected due to timeout", id);
+            }
+            self.disconnect_player(&addr);
+        }
     }
+
     pub fn active_player_addrs(&self) -> Vec<SocketAddr> {
-        self.players.iter()
-            .filter(|(_, p)| p.active)
-            .map(|(addr, _)| *addr)
-            .collect()
+        self.players.keys().cloned().collect()
     }
 
     /// Remove player on disconnect
     pub fn disconnect_player(&mut self, addr: &SocketAddr) {
+        if let Some(id) = self.addr_to_id.remove(addr) {
+            if let Some(player) = self.players.get(addr) {
+                // Store player info for grace period
+                self.disconnected_players.insert(id, DisconnectedPlayer {
+                    position: player.position,
+                    color: player.color,
+                    disconnected_at: Instant::now(),
+                });
+            }
+            self.id_to_addr.remove(&id);
+            self.last_processed.remove(&id);
+        }
         self.players.remove(addr);
+    }
+
+    /// Reconnect a player with their previous ID and position
+    pub fn reconnect_player(&mut self, addr: SocketAddr, id: Uuid, position: Position) {
+        // Check if player was recently disconnected
+        if let Some(disconnected) = self.disconnected_players.remove(&id) {
+            // Update address mappings
+            self.id_to_addr.insert(id, addr);
+            self.addr_to_id.insert(addr, id);
+
+            // Create position history with the reconnected position
+            let mut position_history = Vec::with_capacity(MAX_POSITION_HISTORY);
+            position_history.push(PositionSnapshot {
+                position,
+                timestamp: Instant::now().elapsed().as_millis() as u64,
+            });
+
+            // Recreate player state
+            self.players.insert(
+                addr,
+                PlayerState {
+                    position,
+                    color: disconnected.color,
+                    last_active: Instant::now(),
+                    position_history,
+                },
+            );
+        }
+    }
+
+    /// Clean up expired disconnected players
+    pub fn cleanup_disconnected(&mut self) {
+        let now = Instant::now();
+        self.disconnected_players.retain(|_, player| {
+            now.duration_since(player.disconnected_at) < ID_GRACE_PERIOD
+        });
     }
 
     /// Build a snapshot of active players for broadcasting
@@ -208,7 +271,7 @@ impl Game {
         let players = self.players.iter()
             .map(|(addr, p)| {
                 let player_id = *self.addr_to_id.get(addr).unwrap();
-                (player_id, p.position, p.color, p.active)
+                (player_id, p.position, p.color)
             })
             .collect();
         GameState {
@@ -217,6 +280,7 @@ impl Game {
             server_timestamp: Instant::now().elapsed().as_millis() as u64,
         }
     }
+
     pub fn players(&self) -> &HashMap<SocketAddr, PlayerState> {
         &self.players
     }
@@ -224,5 +288,15 @@ impl Game {
     /// Mutable access to players (use only when necessary)
     pub fn players_mut(&mut self) -> &mut HashMap<SocketAddr, PlayerState> {
         &mut self.players
+    }
+
+    /// Get a reference to the address to ID mapping
+    pub fn addr_to_id(&self) -> &HashMap<SocketAddr, Uuid> {
+        &self.addr_to_id
+    }
+    
+    /// Get a reference to the ID to address mapping
+     pub fn id_to_addr(&self) -> &HashMap<Uuid, SocketAddr> {
+        &self.id_to_addr
     }
 }

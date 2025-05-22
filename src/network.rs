@@ -6,6 +6,8 @@ use rand::Rng;
 use rand::seq::SliceRandom;
 use crate::constants::{DELAY_MS, PACKET_LOSS};
 use std::collections::VecDeque;
+use uuid::Uuid;
+use crate::types::Position;
 
 pub struct NetworkClient {
     pub socket: UdpSocket,
@@ -37,6 +39,18 @@ impl NetworkClient {
     
     pub fn send_disconnect(&self) {
         let msg = ClientMessage::Disconnect;
+        let data = bincode::serialize(&msg).unwrap();
+        let _ = self.socket.send_to(&data, &self.server_addr);
+    }
+
+    pub fn send_reconnect(&self, previous_id: Uuid, position: Position) {
+        let msg = ClientMessage::Reconnect(previous_id, position);
+        let data = bincode::serialize(&msg).unwrap();
+        let _ = self.socket.send_to(&data, &self.server_addr);
+    }
+
+    pub fn send_ping(&self, timestamp: u64) {
+        let msg = ClientMessage::Ping(timestamp);
         let data = bincode::serialize(&msg).unwrap();
         let _ = self.socket.send_to(&data, &self.server_addr);
     }
