@@ -1,25 +1,14 @@
 use macroquad::prelude::*;
 use std::collections::HashMap;
-use crate::types::{PlayerInput, Direction, Position};
+use crate::types::{PlayerInput, Direction, Position, PredictionState};
 use crate::network::NetworkClient;
 use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED, DELAY_MS, PACKET_LOSS};
 
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
     key_states: HashMap<KeyCode, bool>,
-    input_seq: u32,
-    pending_inputs: Vec<PlayerInput>,
     pub delay_ms: i32,
     pub packet_loss: i32,
-}
-pub struct PendingInput {
-    pub seq: u32,
-    pub input: PlayerInput,
-}
-
-pub struct InputHistory {
-    pub seq_counter: u32,
-    pub pending_inputs: Vec<PendingInput>,
 }
 
 impl InputHandler {
@@ -27,8 +16,6 @@ impl InputHandler {
         InputHandler {
             key_timers: HashMap::new(),
             key_states: HashMap::new(),
-            input_seq: 0,
-            pending_inputs: Vec::new(),
             delay_ms: DELAY_MS,
             packet_loss: PACKET_LOSS,
         }
@@ -52,6 +39,7 @@ impl InputHandler {
         my_pos: &mut Position,
         net: &mut NetworkClient,
         dt: f32,
+        prediction: &mut PredictionState,
     ) {
         // Input handling and prediction
         for &key in &[KeyCode::W, KeyCode::A, KeyCode::S, KeyCode::D] {
@@ -71,13 +59,14 @@ impl InputHandler {
                     KeyCode::D => Direction::Right,
                     _ => continue,
                 };
+
                 let input = PlayerInput {
                     dir,
-                    seq: self.input_seq,
+                    sequence: prediction.next_sequence,
                 };
-                self.input_seq += 1;
+                prediction.pending_inputs.push_back((prediction.next_sequence, input));
+                prediction.next_sequence += 1;
                 net.send_input(input);
-                self.pending_inputs.push(input);
 
                 // Predict movement
                 match dir {
@@ -104,13 +93,14 @@ impl InputHandler {
                         KeyCode::D => Direction::Right,
                         _ => continue,
                     };
+
                     let input = PlayerInput {
                         dir,
-                        seq: self.input_seq,
+                        sequence: prediction.next_sequence,
                     };
-                    self.input_seq += 1;
+                    prediction.pending_inputs.push_back((prediction.next_sequence, input));
+                    prediction.next_sequence += 1;
                     net.send_input(input);
-                    self.pending_inputs.push(input);
 
                     // Predict movement
                     match dir {
@@ -124,24 +114,6 @@ impl InputHandler {
                 // Key released: reset state
                 self.key_states.insert(key, false);
                 self.key_timers.remove(&key);
-            }
-        }
-    }
-    // Call this every frame after receiving a snapshot
-    pub fn reconcile(&mut self, server_pos: Position, last_ack_seq: u32, my_pos: &mut Position) {
-        // Step 1: Remove acknowledged inputs
-        self.pending_inputs.retain(|input| input.seq > last_ack_seq);
-
-        // Step 2: Reset to server position
-        *my_pos = server_pos;
-
-        // Step 3: Re-apply pending inputs
-        for input in &self.pending_inputs {
-            match input.dir {
-                Direction::Up => my_pos.y = my_pos.y.saturating_sub(PLAYER_SPEED),
-                Direction::Down => my_pos.y = my_pos.y.saturating_add(PLAYER_SPEED),
-                Direction::Left => my_pos.x = my_pos.x.saturating_sub(PLAYER_SPEED),
-                Direction::Right => my_pos.x = my_pos.x.saturating_add(PLAYER_SPEED),
             }
         }
     }

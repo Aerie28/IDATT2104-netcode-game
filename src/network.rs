@@ -7,7 +7,7 @@ use rand::Rng;
 use crate::constants::{DELAY_MS, PACKET_LOSS};
 
 pub struct NetworkClient {
-    socket: UdpSocket,
+    pub socket: UdpSocket,
     server_addr: String,
     client_addr: Option<SocketAddr>,
     pub delay_ms: i32,

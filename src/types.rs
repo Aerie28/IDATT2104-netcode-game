@@ -1,10 +1,11 @@
+use std::collections::{HashMap, VecDeque};
 use serde::{Deserialize, Serialize};
-use std::net::SocketAddr;
-
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ClientMessage {
     Connect,
+    PlayerId(Uuid),
     Input(PlayerInput),
     Disconnect,
 }
@@ -19,7 +20,7 @@ pub enum Direction {
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
 pub struct PlayerInput {
     pub dir: Direction,
-    pub seq: u32,
+    pub sequence: u32,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy)]
@@ -35,20 +36,14 @@ pub struct Board {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct PlayerSnapshot {
-    pub addr: SocketAddr,
-    pub pos: Position,
-    pub color: u32,
-    pub active: bool,
-    pub last_input_seq: u32, 
-}
-#[derive(Serialize, Deserialize, Debug)]
-pub struct RemotePlayerState {
-    pub current: Position,
-    pub previous: Position,
-    pub last_update_time: f64,
-}
-#[derive(Serialize, Deserialize, Debug)]
 pub struct GameState {
-    pub players: Vec<PlayerSnapshot>,
+    pub players: Vec<(Uuid, Position, u32, bool)>, // id, pos, color, active
+    pub last_processed: HashMap<Uuid, u32>, // Track inputs
+}
+
+#[derive(Debug)]
+pub struct PredictionState {
+    pub next_sequence: u32,
+    pub pending_inputs: VecDeque<(u32, PlayerInput)>,
+    pub last_server_pos: Position,
 }

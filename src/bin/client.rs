@@ -1,88 +1,79 @@
 use macroquad::prelude::*;
-use std::collections::HashMap;
+use uuid::Uuid;
+use std::collections::{HashMap, VecDeque};
 use netcode_game::render::Renderer;
 use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
-use netcode_game::types::{PlayerSnapshot, Position, RemotePlayerState};
+use netcode_game::types::{Direction, PlayerInput, Position, PredictionState };
 use netcode_game::config::config_window;
-use std::net::SocketAddr;
-use netcode_game::constants::INTERPOLATION_DELAY;
+use netcode_game::types::{ClientMessage, GameState};
 
 #[macroquad::main(config_window)]
 async fn main() {
-    let mut all_players: HashMap<SocketAddr, (RemotePlayerState, u32, bool)> = HashMap::new();
     let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
-
+    
     // Initialize helpers
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
+    let mut prediction = PredictionState {
+        next_sequence: 0,
+        pending_inputs: VecDeque::new(),
+        last_server_pos: Position { x: 320, y: 240 },
+    };
 
-    let mut my_addr: Option<SocketAddr> = None;
+    let mut all_players: HashMap<Uuid, (Position, u32, bool)> = HashMap::new();
+    let mut my_id: Option<Uuid> = None;
     let mut my_pos: Position = Position { x: 320, y: 240 };
     
     loop {
-        if is_key_pressed(KeyCode::Escape) {
-            net.send_disconnect(); // <- your custom method to inform the server
-            break; // exit the loop
-        }
-
         // Handle key input
         let dt = get_frame_time();
-        input_handler.handle_input(&mut my_pos, &mut net, dt);
+        input_handler.handle_input(&mut my_pos, &mut net, dt, &mut prediction);
         input_handler.handle_selector_input();
         net.delay_ms = input_handler.delay_ms;
         net.packet_loss = input_handler.packet_loss;
 
+        let mut buf = [0u8; 2048];
+        if let Ok((size, _)) = net.socket.recv_from(&mut buf) {
+            if let Ok(snapshot) = bincode::deserialize::<GameState>(&buf[..size]) {
+                all_players.clear();
+                for (id, pos, color, active) in snapshot.players {
+                    if Some(id) == my_id {
+                        // Store the authoritative position
+                        prediction.last_server_pos = pos;
+                        my_pos = pos; // Start with server position
 
-        // Receive snapshot and correct position
-        if let Some(snapshot) = net.try_receive_snapshot() {
-            let now = get_time(); // Current time in seconds (macroquad)
+                        // Get last processed input for this player
+                        if let Some(&last_processed) = snapshot.last_processed.get(&id) {
+                            // Remove acknowledged inputs
+                            while let Some((seq, _)) = prediction.pending_inputs.front() {
+                                if *seq <= last_processed {
+                                    prediction.pending_inputs.pop_front();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
 
-            for PlayerSnapshot { addr, pos, color, active, last_input_seq } in snapshot.players {
-                if my_addr.is_none() {
-                    my_addr = Some(addr);
-                    net.set_client_addr(addr);
-                    my_pos = pos;
-                } else if Some(addr) == my_addr {
-                    input_handler.reconcile(pos, last_input_seq, &mut my_pos);
-                } else {
-                    all_players
-                        .entry(addr)
-                        .and_modify(|(state, _, _)| {
-                            state.previous = state.current;
-                            state.current = pos;
-                            state.last_update_time = now;
-                        })
-                        .or_insert((
-                            RemotePlayerState {
-                                current: pos,
-                                previous: pos,
-                                last_update_time: now,
-                            },
-                            color,
-                            active,
-                        ));
+                        // Reapply pending inputs
+                        for (_, input) in &prediction.pending_inputs {
+                            apply_input_to_position(&mut my_pos, *input, dt);
+                        }
+                    }
+                    all_players.insert(id, (pos, color, active));
                 }
             }
         }
 
         renderer.clear();
 
-        let now = get_time();
         // Draw all players, using predicted position for yourself
-        for (addr, (state, color, active)) in &all_players {
-            let (draw_x, draw_y) = if Some(*addr) == my_addr {
+        for (id, (pos, color, active)) in &all_players {
+            let (draw_x, draw_y) = if Some(*id) == my_id {
                 (my_pos.x as f32, my_pos.y as f32)
             } else {
-                // Interpolate based on how much time has passed since last update
-                let elapsed = (now - state.last_update_time) as f32;
-                let alpha = (elapsed / INTERPOLATION_DELAY).clamp(0.0, 1.0); // assuming ~20Hz updates (every 50ms)
-
-                let interp_x = state.previous.x as f32 * (1.0 - alpha) + state.current.x as f32 * alpha;
-                let interp_y = state.previous.y as f32 * (1.0 - alpha) + state.current.y as f32 * alpha;
-
-                (interp_x, interp_y)
+                (pos.x as f32, pos.y as f32)
             };
 
             let mut color = Color::from_rgba(
@@ -92,12 +83,25 @@ async fn main() {
                 255,
             );
 
+            // Dim color if inactive
             if !*active {
                 color = Color::new(color.r * 0.5, color.g * 0.5, color.b * 0.5, 1.0);
             }
 
             renderer.draw_player(draw_x, draw_y, color);
         }
+        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss);
+
+        next_frame().await;
     }
 }
-        
+
+fn apply_input_to_position(pos: &mut Position, input: PlayerInput, _dt: f32) {
+    use netcode_game::constants::PLAYER_SPEED;
+    match input.dir {
+        Direction::Up => pos.y = pos.y.saturating_sub(PLAYER_SPEED),
+        Direction::Down => pos.y = pos.y.saturating_add(PLAYER_SPEED),
+        Direction::Left => pos.x = pos.x.saturating_sub(PLAYER_SPEED),
+        Direction::Right => pos.x = pos.x.saturating_add(PLAYER_SPEED),
+    }
+}

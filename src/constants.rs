@@ -18,13 +18,13 @@ pub const BROADCAST_INTERVAL: Duration = Duration::from_secs(20);
 
 /// Constants for network
 
-pub const DELAY_MS: i32 = 100;
-pub const PACKET_LOSS: i32 = 10;
+pub const DELAY_MS: i32 = 0;
+pub const PACKET_LOSS: i32 = 0;
 
 /// Constants for inputs from players
-pub const INITIAL_DELAY: f32 = 0.35;
-pub const REPEAT_START: f32 = 0.15;
-pub const REPEAT_MIN: f32 = 0.05;
-pub const REPEAT_ACCEL: f32 = 0.90;
+pub const INITIAL_DELAY: f32 = 0.15;
+pub const REPEAT_START: f32 = 0.1;
+pub const REPEAT_MIN: f32 = 0.0;
+pub const REPEAT_ACCEL: f32 = 0.3;
 
 
