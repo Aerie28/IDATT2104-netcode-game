@@ -20,6 +20,7 @@ pub struct Game {
     players: HashMap<SocketAddr, PlayerState>,
     id_to_addr: HashMap<Uuid, SocketAddr>,
     addr_to_id: HashMap<SocketAddr, Uuid>,
+    last_processed: HashMap<Uuid, u32>, // Track inputs
 }
 
 impl Game {
@@ -28,6 +29,7 @@ impl Game {
             players: HashMap::new(),
             id_to_addr: HashMap::new(),
             addr_to_id: HashMap::new(),
+            last_processed: HashMap::new(),
         }
         
     }
@@ -76,6 +78,11 @@ impl Game {
             player.last_active = Instant::now();
             player.active = true;
 
+            // Update last processed input
+            if let Some(id) = self.addr_to_id.get(&addr) {
+                self.last_processed.insert(*id, input.sequence);
+            }
+
             match input.dir {
                 Direction::Up => player.position.y = player.position.y.saturating_sub(PLAYER_SPEED),
                 Direction::Down => player.position.y = player.position.y.saturating_add(PLAYER_SPEED),
@@ -114,7 +121,10 @@ impl Game {
                 (player_id, p.position, p.color, p.active)
             })
             .collect();
-        GameState { players }
+        GameState {
+            players,
+            last_processed: self.last_processed.clone(),
+        }
     }
     pub fn players(&self) -> &HashMap<SocketAddr, PlayerState> {
         &self.players

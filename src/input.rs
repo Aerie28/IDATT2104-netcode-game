@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use std::collections::HashMap;
-use crate::types::{PlayerInput, Direction, Position};
+use crate::types::{PlayerInput, Direction, Position, PredictionState};
 use crate::network::NetworkClient;
 use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED, DELAY_MS, PACKET_LOSS};
 
@@ -39,6 +39,7 @@ impl InputHandler {
         my_pos: &mut Position,
         net: &mut NetworkClient,
         dt: f32,
+        prediction: &mut PredictionState,
     ) {
         // Input handling and prediction
         for &key in &[KeyCode::W, KeyCode::A, KeyCode::S, KeyCode::D] {
@@ -58,7 +59,14 @@ impl InputHandler {
                     KeyCode::D => Direction::Right,
                     _ => continue,
                 };
-                net.send_input(PlayerInput { dir });
+
+                let input = PlayerInput {
+                    dir,
+                    sequence: prediction.next_sequence,
+                };
+                prediction.pending_inputs.push_back((prediction.next_sequence, input));
+                prediction.next_sequence += 1;
+                net.send_input(input);
 
                 // Predict movement
                 match dir {
@@ -85,7 +93,14 @@ impl InputHandler {
                         KeyCode::D => Direction::Right,
                         _ => continue,
                     };
-                    net.send_input(PlayerInput { dir });
+
+                    let input = PlayerInput {
+                        dir,
+                        sequence: prediction.next_sequence,
+                    };
+                    prediction.pending_inputs.push_back((prediction.next_sequence, input));
+                    prediction.next_sequence += 1;
+                    net.send_input(input);
 
                     // Predict movement
                     match dir {
