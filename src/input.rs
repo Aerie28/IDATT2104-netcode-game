@@ -2,13 +2,15 @@ use macroquad::prelude::*;
 use std::collections::HashMap;
 use crate::types::{PlayerInput, Direction, Position};
 use crate::network::NetworkClient;
-use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED};
+use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED, DELAY_MS, PACKET_LOSS};
 
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
     key_states: HashMap<KeyCode, bool>,
     input_seq: u32,
     pending_inputs: Vec<PlayerInput>,
+    pub delay_ms: i32,
+    pub packet_loss: i32,
 }
 pub struct PendingInput {
     pub seq: u32,
@@ -27,9 +29,24 @@ impl InputHandler {
             key_states: HashMap::new(),
             input_seq: 0,
             pending_inputs: Vec::new(),
+            delay_ms: DELAY_MS,
+            packet_loss: PACKET_LOSS,
         }
     }
-
+    pub fn handle_selector_input(&mut self) {
+        if is_key_pressed(KeyCode::V) {
+            self.delay_ms = (self.delay_ms - 10).max(0);
+        }
+        if is_key_pressed(KeyCode::B) {
+            self.delay_ms = (self.delay_ms + 10).min(1000);
+        }
+        if is_key_pressed(KeyCode::N) {
+            self.packet_loss = (self.packet_loss - 1).max(0);
+        }
+        if is_key_pressed(KeyCode::M) {
+            self.packet_loss = (self.packet_loss + 1).min(100);
+        }
+    }
     pub fn handle_input(
         &mut self,
         my_pos: &mut Position,
