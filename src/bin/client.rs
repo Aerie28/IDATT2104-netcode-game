@@ -1,10 +1,10 @@
 use macroquad::prelude::*;
 use uuid::Uuid;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use netcode_game::render::Renderer;
 use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
-use netcode_game::types::{Position};
+use netcode_game::types::{Direction, PlayerInput, Position, PredictionState };
 use netcode_game::config::config_window;
 use netcode_game::types::{ClientMessage, GameState};
 
@@ -16,6 +16,11 @@ async fn main() {
     // Initialize helpers
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
+    let mut prediction = PredictionState {
+        next_sequence: 0,
+        pending_inputs: VecDeque::new(),
+        last_server_pos: Position { x: 320, y: 240 },
+    };
 
     let mut all_players: HashMap<Uuid, (Position, u32, bool)> = HashMap::new();
     let mut my_id: Option<Uuid> = None;
@@ -24,20 +29,37 @@ async fn main() {
     loop {
         // Handle key input
         let dt = get_frame_time();
-        input_handler.handle_input(&mut my_pos, &mut net, dt);
+        input_handler.handle_input(&mut my_pos, &mut net, dt, &mut prediction);
         input_handler.handle_selector_input();
         net.delay_ms = input_handler.delay_ms;
         net.packet_loss = input_handler.packet_loss;
 
         let mut buf = [0u8; 2048];
         if let Ok((size, _)) = net.socket.recv_from(&mut buf) {
-            if let Ok(ClientMessage::PlayerId(id)) = bincode::deserialize::<ClientMessage>(&buf[..size]) {
-                my_id = Some(id);
-            } else if let Ok(snapshot) = bincode::deserialize::<GameState>(&buf[..size]) {
+            if let Ok(snapshot) = bincode::deserialize::<GameState>(&buf[..size]) {
                 all_players.clear();
                 for (id, pos, color, active) in snapshot.players {
                     if Some(id) == my_id {
-                        my_pos = pos;
+                        // Store the authoritative position
+                        prediction.last_server_pos = pos;
+                        my_pos = pos; // Start with server position
+
+                        // Get last processed input for this player
+                        if let Some(&last_processed) = snapshot.last_processed.get(&id) {
+                            // Remove acknowledged inputs
+                            while let Some((seq, _)) = prediction.pending_inputs.front() {
+                                if *seq <= last_processed {
+                                    prediction.pending_inputs.pop_front();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Reapply pending inputs
+                        for (_, input) in &prediction.pending_inputs {
+                            apply_input_to_position(&mut my_pos, *input, dt);
+                        }
                     }
                     all_players.insert(id, (pos, color, active));
                 }
@@ -71,5 +93,15 @@ async fn main() {
         renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss);
 
         next_frame().await;
+    }
+}
+
+fn apply_input_to_position(pos: &mut Position, input: PlayerInput, _dt: f32) {
+    use netcode_game::constants::PLAYER_SPEED;
+    match input.dir {
+        Direction::Up => pos.y = pos.y.saturating_sub(PLAYER_SPEED),
+        Direction::Down => pos.y = pos.y.saturating_add(PLAYER_SPEED),
+        Direction::Left => pos.x = pos.x.saturating_sub(PLAYER_SPEED),
+        Direction::Right => pos.x = pos.x.saturating_add(PLAYER_SPEED),
     }
 }
