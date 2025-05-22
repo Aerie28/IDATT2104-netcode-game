@@ -1,16 +1,18 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::collections::HashMap;
+use std::time::Instant;
 
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio::time;
 
 use bincode;
+use uuid::Uuid;
 
 use netcode_game::game::Game;
 use netcode_game::types::{ClientMessage, GameState};
 use netcode_game::constants::BROADCAST_INTERVAL;
-
 
 #[tokio::main]
 async fn main() {
@@ -35,13 +37,20 @@ async fn main() {
             game.update_inactive();
             let snapshot = game.build_snapshot();
 
+            // Add server timestamp to the game state
+            let game_state = GameState {
+                players: snapshot.players,
+                last_processed: snapshot.last_processed,
+                server_timestamp: Instant::now().elapsed().as_millis() as u64,
+            };
+
             // Get only active players' addresses
             let active_players = game.active_player_addrs();
             let num_active = active_players.len();
             println!("Periodic: Sending snapshot to {} active clients", num_active);
 
             // Send snapshot only to active players
-            broadcast_snapshot_to_selected(&socket_clone, &active_players, &snapshot).await;
+            broadcast_snapshot_to_selected(&socket_clone, &active_players, &game_state).await;
         }
     });
 
@@ -62,10 +71,21 @@ async fn main() {
                             let id_payload = bincode::serialize(&id_msg).unwrap();
                             let _ = socket.send_to(&id_payload, addr).await;
                             
+                            // Send initial game state to the new player
+                            let snapshot = game.build_snapshot();
+                            let game_state = GameState {
+                                players: snapshot.players,
+                                last_processed: snapshot.last_processed,
+                                server_timestamp: Instant::now().elapsed().as_millis() as u64,
+                            };
+                            let state_payload = bincode::serialize(&game_state).unwrap();
+                            let _ = socket.send_to(&state_payload, addr).await;
+                            
                             println!("Client {} connected with ID {}", addr, id);
                         }
                         ClientMessage::Input(input) => {
                             game.handle_input(addr, input);
+                            game.update_inactive();
                         }
                         ClientMessage::Disconnect => {
                             game.disconnect_player(&addr);
@@ -76,13 +96,6 @@ async fn main() {
                             println!("Received PlayerId message from client {}", addr);
                         }
                     }
-
-                    game.update_inactive();
-                    let snapshot = game.build_snapshot();
-                    let num_players = snapshot.players.len();
-                    println!("Input: Sending snapshot to {} clients", num_players);
-
-                    broadcast_snapshot(&socket, game.players(), &snapshot).await;
                 }
             }
             Err(e) => {

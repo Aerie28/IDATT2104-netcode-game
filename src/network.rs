@@ -61,6 +61,19 @@ impl NetworkClient {
         }
     }
 
+    pub fn try_receive_message(&self) -> Option<ClientMessage> {
+        if self.simulate_network_conditions() {
+            // Drop the packet (simulate loss)
+            return None;
+        }
+        let mut buf = [0u8; 2048];
+        if let Ok((size, _)) = self.socket.recv_from(&mut buf) {
+            bincode::deserialize(&buf[..size]).ok()
+        } else {
+            None
+        }
+    }
+
     pub fn set_client_addr(&mut self, addr: SocketAddr) {
         self.client_addr = Some(addr);
     }

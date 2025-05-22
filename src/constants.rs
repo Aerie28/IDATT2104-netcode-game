@@ -14,7 +14,7 @@ pub const PLAYER_SIZE: f32 = 20.0;
 pub const PLAYER_SPEED: i32 = 5;
 
 /// Constants for server
-pub const BROADCAST_INTERVAL: Duration = Duration::from_secs(20);
+pub const BROADCAST_INTERVAL: Duration = Duration::from_millis(100);
 
 /// Constants for network
 

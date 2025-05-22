@@ -31,7 +31,6 @@ impl Game {
             addr_to_id: HashMap::new(),
             last_processed: HashMap::new(),
         }
-        
     }
 
     /// Handles new connection by adding player at random pos/color
@@ -124,6 +123,7 @@ impl Game {
         GameState {
             players,
             last_processed: self.last_processed.clone(),
+            server_timestamp: Instant::now().elapsed().as_millis() as u64,
         }
     }
     pub fn players(&self) -> &HashMap<SocketAddr, PlayerState> {
@@ -134,5 +134,4 @@ impl Game {
     pub fn players_mut(&mut self) -> &mut HashMap<SocketAddr, PlayerState> {
         &mut self.players
     }
-    
 }
