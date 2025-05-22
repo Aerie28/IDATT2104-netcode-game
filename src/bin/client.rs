@@ -88,9 +88,9 @@ async fn main() {
                             interpolated_pos.x as f32,
                             interpolated_pos.y as f32,
                             Color::from_rgba(
-                                ((color >> 16) & 0xFF) as u8,
-                                ((color >> 8) & 0xFF) as u8,
-                                (color & 0xFF) as u8,
+                                ((color >> 16) & 0xFF_u32) as u8,
+                                ((color >> 8) & 0xFF_u32) as u8,
+                                (color & 0xFF_u32) as u8,
                                 255,
                             ),
                         );
@@ -100,11 +100,11 @@ async fn main() {
                             pos.x as f32,
                             pos.y as f32,
                             Color::from_rgba(
-                                ((color >> 16) & 0xFF) as u8,
-                                ((color >> 8) & 0xFF) as u8,
-                                (color & 0xFF) as u8,
+                                ((color >> 16) & 0xFF_u32) as u8,
+                                ((color >> 8) & 0xFF_u32) as u8,
+                                (color & 0xFF_u32) as u8,
                                 255,
-                            ),
+                            )
                         );
                     }
                 }
@@ -132,9 +132,9 @@ async fn main() {
                     my_pos.x as f32,
                     my_pos.y as f32,
                     Color::from_rgba(
-                        ((color >> 16) & 0xFF) as u8,
-                        ((color >> 8) & 0xFF) as u8,
-                        (color & 0xFF) as u8,
+                        ((color >> 16) & 0xFF_u32) as u8,
+                        ((color >> 8) & 0xFF_u32) as u8,
+                        (color & 0xFF_u32) as u8,
                         255,
                     ),
                 );
