@@ -8,6 +8,7 @@ use netcode_game::types::{Position, ClientMessage};
 use netcode_game::config::config_window;
 use netcode_game::prediction::PredictionState;
 use netcode_game::interpolation::InterpolationState;
+use netcode_game::constants::PREDICTION_ERROR_THRESHOLD;
 
 #[macroquad::main(config_window)]
 async fn main() {
@@ -24,8 +25,11 @@ async fn main() {
     let mut interpolated_positions: HashMap<Uuid, InterpolationState> = HashMap::new();
     let mut my_id: Option<Uuid> = None;
     let mut my_pos: Position = initial_position;
+    let mut prediction_errors: HashMap<Uuid, f32> = HashMap::new();
     
     loop {
+        let current_time = get_time();
+        
         // Handle input and prediction for local player
         input_handler.handle_selector_input();
         input_handler.handle_input(&mut my_pos, &mut net, get_frame_time(), &mut prediction);
@@ -38,12 +42,23 @@ async fn main() {
             for (id, pos, _color, _active) in &game_state.players {
                 if Some(*id) != my_id {
                     let interpolation = interpolated_positions.entry(*id).or_insert_with(InterpolationState::new);
-                    interpolation.add_position(*pos, get_time() as f32);
+                    interpolation.add_position(*pos, current_time as f32, game_state.last_processed.get(id).copied().unwrap_or(0));
                 }
             }
 
-            // Update all players map without replacing it
+            // Update all players map and check for prediction errors
             for (id, pos, color, active) in &game_state.players {
+                if Some(*id) == my_id {
+                    // Reconcile prediction with server state
+                    prediction.reconcile(*pos, game_state.last_processed.get(id).copied().unwrap_or(0), current_time);
+                    
+                    // Calculate prediction error
+                    let error = prediction.get_prediction_error(*pos);
+                    prediction_errors.insert(*id, error);
+                    
+                    // Reapply pending inputs after reconciliation
+                    prediction.reapply_pending_inputs(&mut my_pos);
+                }
                 all_players.insert(*id, (*pos, *color, *active));
             }
         }
@@ -63,7 +78,7 @@ async fn main() {
             if Some(*id) != my_id {
                 // Get interpolated position for other players
                 if let Some(interpolation) = interpolated_positions.get(id) {
-                    if let Some(interpolated_pos) = interpolation.get_interpolated_position(get_time() as f32) {
+                    if let Some(interpolated_pos) = interpolation.get_interpolated_position(current_time as f32) {
                         renderer.draw_player(
                             interpolated_pos.x as f32,
                             interpolated_pos.y as f32,
@@ -89,7 +104,25 @@ async fn main() {
                     }
                 }
             } else {
-                // Draw local player without interpolation
+                // Draw local player with prediction error visualization
+                let error = prediction_errors.get(id).copied().unwrap_or(0.0);
+                let error_color = if error > PREDICTION_ERROR_THRESHOLD {
+                    Color::from_rgba(255, 0, 0, 128) // Red tint for large errors
+                } else {
+                    Color::from_rgba(0, 255, 0, 128) // Green tint for small errors
+                };
+
+                // Draw prediction error indicator
+                if error > 0.0 {
+                    draw_circle(
+                        my_pos.x as f32,
+                        my_pos.y as f32,
+                        error * 2.0,
+                        error_color,
+                    );
+                }
+
+                // Draw the player
                 renderer.draw_player(
                     my_pos.x as f32,
                     my_pos.y as f32,
@@ -102,6 +135,8 @@ async fn main() {
                 );
             }
         }
+
+        // Draw network stats
         renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss);
 
         next_frame().await;

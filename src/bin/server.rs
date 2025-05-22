@@ -35,13 +35,23 @@ async fn main() {
 
             let mut game = game_clone.lock().await;
             game.update_inactive();
+
+            // Check for collisions using lag compensation
+            let current_time = Instant::now().elapsed().as_millis() as u64;
+            let collisions = game.check_collisions_at_time(current_time);
+            
+            // Handle collisions (for now, just print them)
+            for (id1, id2) in collisions {
+                println!("Collision detected between players {} and {}", id1, id2);
+            }
+
             let snapshot = game.build_snapshot();
 
             // Add server timestamp to the game state
             let game_state = GameState {
                 players: snapshot.players,
                 last_processed: snapshot.last_processed,
-                server_timestamp: Instant::now().elapsed().as_millis() as u64,
+                server_timestamp: current_time,
             };
 
             // Get only active players' addresses

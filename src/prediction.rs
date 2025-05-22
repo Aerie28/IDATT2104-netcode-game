@@ -8,6 +8,7 @@ pub struct PredictionState {
     pub position_history: VecDeque<(u32, Position)>, // (sequence, position)
     pub last_confirmed_sequence: u32,
     pub last_confirmed_position: Position,
+    pub last_reconciliation_time: f64,
 }
 
 impl PredictionState {
@@ -18,6 +19,7 @@ impl PredictionState {
             position_history: VecDeque::new(),
             last_confirmed_sequence: 0,
             last_confirmed_position: initial_position,
+            last_reconciliation_time: 0.0,
         }
     }
 
@@ -34,9 +36,13 @@ impl PredictionState {
         }
     }
 
-    pub fn reconcile(&mut self, server_position: Position, server_sequence: u32) {
+    pub fn reconcile(&mut self, server_position: Position, server_sequence: u32, current_time: f64) {
         // If we've received a newer server state
         if server_sequence > self.last_confirmed_sequence {
+            // Calculate time since last reconciliation
+            let time_since_last = current_time - self.last_reconciliation_time;
+            self.last_reconciliation_time = current_time;
+
             // Update our confirmed state
             self.last_confirmed_sequence = server_sequence;
             self.last_confirmed_position = server_position;
@@ -58,6 +64,15 @@ impl PredictionState {
                     break;
                 }
             }
+
+            // If we have a large gap between server and client sequence,
+            // we might have missed some updates. In this case, we should
+            // be more aggressive with reconciliation
+            if server_sequence - self.last_confirmed_sequence > 5 {
+                // Clear all pending inputs and position history
+                self.pending_inputs.clear();
+                self.position_history.clear();
+            }
         }
     }
 
@@ -72,5 +87,11 @@ impl PredictionState {
         for input in inputs {
             self.apply_prediction(input, current_position);
         }
+    }
+
+    pub fn get_prediction_error(&self, server_position: Position) -> f32 {
+        let dx = (server_position.x - self.last_confirmed_position.x) as f32;
+        let dy = (server_position.y - self.last_confirmed_position.y) as f32;
+        (dx * dx + dy * dy).sqrt()
     }
 } 
