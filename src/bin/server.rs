@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
+use std::time::Duration;
 
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
@@ -63,11 +64,12 @@ async fn main() {
     // Spawn a task to clean up expired disconnected players
     let game_clone = game.clone();
     tokio::spawn(async move {
-        let mut interval = time::interval(PING_INTERVAL); // Use PING_INTERVAL for cleanup
+        let mut interval = time::interval(Duration::from_secs(1)); // Clean up every second
         loop {
             interval.tick().await;
             let mut game = game_clone.lock().await;
-            game.cleanup_disconnected();
+            let now = Instant::now();
+            game.cleanup_disconnected_with_time(now);
         }
     });
 
@@ -131,7 +133,7 @@ async fn main() {
                             } else {
                                 // ID not found in disconnected_players, treat as new connection
                                 let id = game.connect_player(addr);
-                                println!("Previous ID {} not found, assigned new ID {} to {}", previous_id, id, addr);
+                                println!("Previous ID {} not found in disconnected players, assigned new ID {} to {}", previous_id, id, addr);
                             }
                         }
                         ClientMessage::Input(input) => {

@@ -84,7 +84,8 @@ async fn main() {
         
         // Send periodic ping if connected
         if is_connected && last_ping_time.elapsed() >= PING_INTERVAL {
-            net.send_ping(current_time as u64);
+            let current_time = get_time();
+            net.send_ping((current_time * 1000.0) as u64); // Convert to milliseconds
             last_ping_time = Instant::now();
         }
         
@@ -97,6 +98,20 @@ async fn main() {
 
             // Receive and process game state from server
             if let Some(game_state) = net.try_receive_snapshot() {
+                let current_time = get_time();
+                let server_time = game_state.server_timestamp as f64 / 1000.0; // Convert from milliseconds to seconds
+                let time_diff = current_time - server_time;
+                
+                // Create a set of current player IDs from the server
+                let current_player_ids: std::collections::HashSet<Uuid> = game_state.players.iter()
+                    .map(|(id, _, _)| *id)
+                    .collect();
+
+                // Remove players that are no longer in the game state
+                all_players.retain(|id, _| current_player_ids.contains(id));
+                interpolated_positions.retain(|id, _| current_player_ids.contains(id));
+                prediction_errors.retain(|id, _| current_player_ids.contains(id));
+
                 // Update interpolation states for other players
                 for (id, pos, _color) in &game_state.players {
                     if Some(*id) != my_id {
@@ -193,6 +208,7 @@ async fn main() {
                         255,
                     ),
                 );
+                
             }
         }
 
