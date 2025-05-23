@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/netcode-client.iml" filepath="$PROJECT_DIR$/.idea/netcode-client.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/IDATT2104-netcode-game.iml" filepath="$PROJECT_DIR$/.idea/IDATT2104-netcode-game.iml" />
     </modules>
   </component>
 </project>

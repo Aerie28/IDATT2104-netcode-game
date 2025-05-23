@@ -6,14 +6,29 @@ use std::{
 };
 use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT};
+use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, ID_GRACE_PERIOD};
+
+const MAX_POSITION_HISTORY: usize = 60; // Store 1 second of history at 60fps
+
+#[derive(Clone)]
+pub struct PositionSnapshot {
+    pub position: Position,
+    pub timestamp: u64,
+}
 
 /// Stores state for one player
 pub struct PlayerState {
     pub position: Position,
     pub color: u32,
     pub last_active: Instant,
-    pub active: bool,
+    pub position_history: Vec<PositionSnapshot>,
+}
+
+/// Stores information about disconnected players
+struct DisconnectedPlayer {
+    position: Position,
+    color: u32,
+    disconnected_at: Instant,
 }
 
 pub struct Game {
@@ -21,6 +36,7 @@ pub struct Game {
     id_to_addr: HashMap<Uuid, SocketAddr>,
     addr_to_id: HashMap<SocketAddr, Uuid>,
     last_processed: HashMap<Uuid, u32>, // Track inputs
+    disconnected_players: HashMap<Uuid, DisconnectedPlayer>, // Track disconnected players
 }
 
 impl Game {
@@ -30,8 +46,8 @@ impl Game {
             id_to_addr: HashMap::new(),
             addr_to_id: HashMap::new(),
             last_processed: HashMap::new(),
+            disconnected_players: HashMap::new(),
         }
-        
     }
 
     /// Handles new connection by adding player at random pos/color
@@ -60,13 +76,20 @@ impl Game {
         self.id_to_addr.insert(id, addr);
         self.addr_to_id.insert(addr, id);
 
+        let initial_position = Position { x, y };
+        let mut position_history = Vec::with_capacity(MAX_POSITION_HISTORY);
+        position_history.push(PositionSnapshot {
+            position: initial_position,
+            timestamp: Instant::now().elapsed().as_millis() as u64,
+        });
+
         self.players.insert(
             addr,
             PlayerState {
-                position: Position { x, y },
+                position: initial_position,
                 color,
                 last_active: Instant::now(),
-                active: true,
+                position_history,
             },
         );
         id
@@ -76,7 +99,6 @@ impl Game {
     pub fn handle_input(&mut self, addr: SocketAddr, input: PlayerInput) {
         if let Some(player) = self.players.get_mut(&addr) {
             player.last_active = Instant::now();
-            player.active = true;
 
             // Update last processed input
             if let Some(id) = self.addr_to_id.get(&addr) {
@@ -89,28 +111,159 @@ impl Game {
                 Direction::Left => player.position.x = player.position.x.saturating_sub(PLAYER_SPEED),
                 Direction::Right => player.position.x = player.position.x.saturating_add(PLAYER_SPEED),
             }
+
+            // Store current position in history
+            let current_time = Instant::now().elapsed().as_millis() as u64;
+            player.position_history.push(PositionSnapshot {
+                position: player.position,
+                timestamp: current_time,
+            });
+
+            // Keep only the last MAX_POSITION_HISTORY entries
+            if player.position_history.len() > MAX_POSITION_HISTORY {
+                player.position_history.remove(0);
+            }
         }
+    }
+
+    /// Get player position at a specific timestamp using interpolation
+    pub fn get_player_position_at_time(&self, player_id: &Uuid, timestamp: u64) -> Option<Position> {
+        let addr = self.id_to_addr.get(player_id)?;
+        let player = self.players.get(addr)?;
+        
+        if player.position_history.is_empty() {
+            return None;
+        }
+
+        // Find the two closest snapshots
+        let mut before = None;
+        let mut after = None;
+
+        for snapshot in &player.position_history {
+            if snapshot.timestamp <= timestamp {
+                before = Some(snapshot);
+            } else {
+                after = Some(snapshot);
+                break;
+            }
+        }
+
+        match (before, after) {
+            (Some(before), Some(after)) => {
+                // Interpolate between the two snapshots
+                let t = (timestamp - before.timestamp) as f32 / (after.timestamp - before.timestamp) as f32;
+                Some(Position {
+                    x: (before.position.x as f32 + (after.position.x - before.position.x) as f32 * t) as i32,
+                    y: (before.position.y as f32 + (after.position.y - before.position.y) as f32 * t) as i32,
+                })
+            }
+            (Some(before), None) => Some(before.position),
+            (None, Some(after)) => Some(after.position),
+            (None, None) => None,
+        }
+    }
+
+    /// Check for collisions at a specific timestamp
+    pub fn check_collisions_at_time(&self, timestamp: u64) -> Vec<(Uuid, Uuid)> {
+        let mut collisions = Vec::new();
+        let player_ids: Vec<Uuid> = self.id_to_addr.keys().cloned().collect();
+
+        for i in 0..player_ids.len() {
+            for j in (i + 1)..player_ids.len() {
+                let id1 = &player_ids[i];
+                let id2 = &player_ids[j];
+
+                if let (Some(pos1), Some(pos2)) = (
+                    self.get_player_position_at_time(id1, timestamp),
+                    self.get_player_position_at_time(id2, timestamp),
+                ) {
+                    // Simple collision detection (players are considered colliding if they're at the same position)
+                    if pos1.x == pos2.x && pos1.y == pos2.y {
+                        collisions.push((*id1, *id2));
+                    }
+                }
+            }
+        }
+
+        collisions
     }
 
     /// Marks players inactive if timeout exceeded
     pub fn update_inactive(&mut self) {
         let now = Instant::now();
-        for player in self.players.values_mut() {
+        let mut to_disconnect = Vec::new();
+        
+        // Check for players that haven't sent a ping in TIMEOUT duration
+        for (addr, player) in self.players.iter() {
             if now.duration_since(player.last_active) >= TIMEOUT {
-                player.active = false;
+                to_disconnect.push(*addr);
             }
         }
+        
+        // Disconnect inactive players
+        for addr in to_disconnect {
+            if let Some(id) = self.addr_to_id.get(&addr) {
+                println!("Player {} disconnected due to timeout", id);
+            }
+            self.disconnect_player(&addr);
+        }
     }
+
     pub fn active_player_addrs(&self) -> Vec<SocketAddr> {
-        self.players.iter()
-            .filter(|(_, p)| p.active)
-            .map(|(addr, _)| *addr)
-            .collect()
+        self.players.keys().cloned().collect()
     }
 
     /// Remove player on disconnect
     pub fn disconnect_player(&mut self, addr: &SocketAddr) {
+        if let Some(id) = self.addr_to_id.remove(addr) {
+            if let Some(player) = self.players.get(addr) {
+                // Store player info for grace period
+                self.disconnected_players.insert(id, DisconnectedPlayer {
+                    position: player.position,
+                    color: player.color,
+                    disconnected_at: Instant::now(),
+                });
+            }
+            self.id_to_addr.remove(&id);
+            self.last_processed.remove(&id);
+        }
         self.players.remove(addr);
+    }
+
+    /// Reconnect a player with their previous ID and position
+    pub fn reconnect_player(&mut self, addr: SocketAddr, id: Uuid, position: Position) {
+        // Check if player was recently disconnected
+        if let Some(disconnected) = self.disconnected_players.remove(&id) {
+            // Update address mappings
+            self.id_to_addr.insert(id, addr);
+            self.addr_to_id.insert(addr, id);
+
+            // Create position history with the reconnected position
+            let mut position_history = Vec::with_capacity(MAX_POSITION_HISTORY);
+            position_history.push(PositionSnapshot {
+                position,
+                timestamp: Instant::now().elapsed().as_millis() as u64,
+            });
+
+            // Recreate player state
+            self.players.insert(
+                addr,
+                PlayerState {
+                    position,
+                    color: disconnected.color,
+                    last_active: Instant::now(),
+                    position_history,
+                },
+            );
+        }
+    }
+
+    /// Clean up expired disconnected players
+    pub fn cleanup_disconnected(&mut self) {
+        let now = Instant::now();
+        self.disconnected_players.retain(|_, player| {
+            now.duration_since(player.disconnected_at) < ID_GRACE_PERIOD
+        });
     }
 
     /// Build a snapshot of active players for broadcasting
@@ -118,14 +271,16 @@ impl Game {
         let players = self.players.iter()
             .map(|(addr, p)| {
                 let player_id = *self.addr_to_id.get(addr).unwrap();
-                (player_id, p.position, p.color, p.active)
+                (player_id, p.position, p.color)
             })
             .collect();
         GameState {
             players,
             last_processed: self.last_processed.clone(),
+            server_timestamp: Instant::now().elapsed().as_millis() as u64,
         }
     }
+
     pub fn players(&self) -> &HashMap<SocketAddr, PlayerState> {
         &self.players
     }
@@ -134,5 +289,14 @@ impl Game {
     pub fn players_mut(&mut self) -> &mut HashMap<SocketAddr, PlayerState> {
         &mut self.players
     }
+
+    /// Get a reference to the address to ID mapping
+    pub fn addr_to_id(&self) -> &HashMap<SocketAddr, Uuid> {
+        &self.addr_to_id
+    }
     
+    /// Get a reference to the ID to address mapping
+     pub fn id_to_addr(&self) -> &HashMap<Uuid, SocketAddr> {
+        &self.id_to_addr
+    }
 }

@@ -1,12 +1,15 @@
 use macroquad::prelude::*;
 use uuid::Uuid;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use netcode_game::render::Renderer;
 use netcode_game::input::InputHandler;
 use netcode_game::network::NetworkClient;
-use netcode_game::types::{Direction, PlayerInput, Position, PredictionState };
+use netcode_game::types::{Position, ClientMessage};
 use netcode_game::config::config_window;
-use netcode_game::types::{ClientMessage, GameState};
+use netcode_game::prediction::PredictionState;
+use netcode_game::interpolation::InterpolationState;
+use netcode_game::constants::{PREDICTION_ERROR_THRESHOLD, PING_INTERVAL};
+use std::time::{Instant};
 
 #[macroquad::main(config_window)]
 async fn main() {
@@ -16,92 +19,178 @@ async fn main() {
     // Initialize helpers
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
-    let mut prediction = PredictionState {
-        next_sequence: 0,
-        pending_inputs: VecDeque::new(),
-        last_server_pos: Position { x: 320, y: 240 },
-    };
+    let initial_position = Position { x: 320, y: 240 };
+    let mut prediction = PredictionState::new(initial_position);
 
-    let mut all_players: HashMap<Uuid, (Position, u32, bool)> = HashMap::new();
+    let mut all_players: HashMap<Uuid, (Position, u32)> = HashMap::new();
+    let mut interpolated_positions: HashMap<Uuid, InterpolationState> = HashMap::new();
     let mut my_id: Option<Uuid> = None;
-    let mut my_pos: Position = Position { x: 320, y: 240 };
+    let mut my_pos: Position = initial_position;
+    let mut prediction_errors: HashMap<Uuid, f32> = HashMap::new();
+    let mut last_ping_time = Instant::now();
+    let mut is_connected = true;
+    
+    // Store previous state for reconnection
+    let mut previous_id: Option<Uuid> = None;
+    let mut previous_position: Option<Position> = None;
     
     loop {
-        // Handle key input
-        let dt = get_frame_time();
-        input_handler.handle_input(&mut my_pos, &mut net, dt, &mut prediction);
-        input_handler.handle_selector_input();
-        net.delay_ms = input_handler.delay_ms;
-        net.packet_loss = input_handler.packet_loss;
+        // Check if window is being closed
+        if is_quit_requested() {
+            // Send disconnect message before closing
+            if my_id.is_some() {
+                net.send_disconnect();
+            }
+            break;
+        }
 
-        let mut buf = [0u8; 2048];
-        if let Ok((size, _)) = net.socket.recv_from(&mut buf) {
-            if let Ok(snapshot) = bincode::deserialize::<GameState>(&buf[..size]) {
-                all_players.clear();
-                for (id, pos, color, active) in snapshot.players {
-                    if Some(id) == my_id {
-                        // Store the authoritative position
-                        prediction.last_server_pos = pos;
-                        my_pos = pos; // Start with server position
+        let current_time = get_time();
+        
+        // Handle disconnect/reconnect
+        if is_key_pressed(KeyCode::R) {
+            if is_connected {
+                // Disconnect
+                if my_id.is_some() {
+                    // Store current state before disconnecting
+                    previous_id = my_id;
+                    previous_position = Some(my_pos);
+                    
+                    net.send_disconnect();
+                    my_id = None;
+                    all_players.clear();
+                    interpolated_positions.clear();
+                    prediction_errors.clear();
+                }
+                is_connected = false;
+            } else {
+                // Reconnect
+                if let Some(prev_id) = previous_id {
+                    // Send reconnect message with previous ID
+                    net.send_reconnect(prev_id, previous_position.unwrap_or(initial_position));
+                } else {
+                    net.send_connect();
+                }
+                is_connected = true;
+            }
+        }
+        
+        // Send periodic ping if connected
+        if is_connected && last_ping_time.elapsed() >= PING_INTERVAL {
+            net.send_ping(current_time as u64);
+            last_ping_time = Instant::now();
+        }
+        
+        // Handle input and prediction for local player
+        if is_connected {
+            input_handler.handle_selector_input();
+            input_handler.handle_input(&mut my_pos, &mut net, get_frame_time(), &mut prediction);
+            net.delay_ms = input_handler.delay_ms;
+            net.packet_loss = input_handler.packet_loss;
 
-                        // Get last processed input for this player
-                        if let Some(&last_processed) = snapshot.last_processed.get(&id) {
-                            // Remove acknowledged inputs
-                            while let Some((seq, _)) = prediction.pending_inputs.front() {
-                                if *seq <= last_processed {
-                                    prediction.pending_inputs.pop_front();
-                                } else {
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Reapply pending inputs
-                        for (_, input) in &prediction.pending_inputs {
-                            apply_input_to_position(&mut my_pos, *input, dt);
-                        }
+            // Receive and process game state from server
+            if let Some(game_state) = net.try_receive_snapshot() {
+                // Update interpolation states for other players
+                for (id, pos, _color) in &game_state.players {
+                    if Some(*id) != my_id {
+                        let interpolation = interpolated_positions.entry(*id).or_insert_with(InterpolationState::new);
+                        interpolation.add_position(*pos, current_time as f32, game_state.last_processed.get(id).copied().unwrap_or(0));
                     }
-                    all_players.insert(id, (pos, color, active));
+                }
+
+                // Update all players map and check for prediction errors
+                for (id, pos, color) in &game_state.players {
+                    if Some(*id) == my_id {
+                        // Reconcile prediction with server state
+                        prediction.reconcile(*pos, game_state.last_processed.get(id).copied().unwrap_or(0), current_time);
+                        
+                        // Calculate prediction error
+                        let error = prediction.get_prediction_error(*pos);
+                        prediction_errors.insert(*id, error);
+                        
+                        // Reapply pending inputs after reconciliation
+                        prediction.reapply_pending_inputs(&mut my_pos);
+                    }
+                    all_players.insert(*id, (*pos, *color));
+                }
+            }
+
+            // Check for PlayerId message
+            if let Some(msg) = net.try_receive_message() {
+                if let ClientMessage::PlayerId(id) = msg {
+                    my_id = Some(id);
+                    println!("Received player ID: {}", id);
                 }
             }
         }
 
         renderer.clear();
 
-        // Draw all players, using predicted position for yourself
-        for (id, (pos, color, active)) in &all_players {
-            let (draw_x, draw_y) = if Some(*id) == my_id {
-                (my_pos.x as f32, my_pos.y as f32)
+        // Draw all players with interpolation
+        for (id, (pos, color)) in all_players.iter() {
+            if Some(*id) != my_id {
+                // Get interpolated position for other players
+                if let Some(interpolation) = interpolated_positions.get(id) {
+                    if let Some(interpolated_pos) = interpolation.get_interpolated_position(current_time as f32) {
+                        renderer.draw_player(
+                            interpolated_pos.x as f32,
+                            interpolated_pos.y as f32,
+                            Color::from_rgba(
+                                ((color >> 16) & 0xFF_u32) as u8,
+                                ((color >> 8) & 0xFF_u32) as u8,
+                                (color & 0xFF_u32) as u8,
+                                255,
+                            ),
+                        );
+                    } else {
+                        // If we don't have enough positions for interpolation, use the current position
+                        renderer.draw_player(
+                            pos.x as f32,
+                            pos.y as f32,
+                            Color::from_rgba(
+                                ((color >> 16) & 0xFF_u32) as u8,
+                                ((color >> 8) & 0xFF_u32) as u8,
+                                (color & 0xFF_u32) as u8,
+                                255,
+                            )
+                        );
+                    }
+                }
             } else {
-                (pos.x as f32, pos.y as f32)
-            };
+                // Draw local player with prediction error visualization
+                let error = prediction_errors.get(id).copied().unwrap_or(0.0);
+                let error_color = if error > PREDICTION_ERROR_THRESHOLD {
+                    Color::from_rgba(255, 0, 0, 128) // Red tint for large errors
+                } else {
+                    Color::from_rgba(0, 255, 0, 128) // Green tint for small errors
+                };
 
-            let mut color = Color::from_rgba(
-                ((color >> 16) & 0xFFu32) as u8,
-                ((color >> 8) & 0xFFu32) as u8,
-                (color & 0xFFu32) as u8,
-                255,
-            );
+                // Draw prediction error indicator
+                if error > 0.0 {
+                    draw_circle(
+                        my_pos.x as f32,
+                        my_pos.y as f32,
+                        error * 2.0,
+                        error_color,
+                    );
+                }
 
-            // Dim color if inactive
-            if !*active {
-                color = Color::new(color.r * 0.5, color.g * 0.5, color.b * 0.5, 1.0);
+                // Draw the player
+                renderer.draw_player(
+                    my_pos.x as f32,
+                    my_pos.y as f32,
+                    Color::from_rgba(
+                        ((color >> 16) & 0xFF_u32) as u8,
+                        ((color >> 8) & 0xFF_u32) as u8,
+                        (color & 0xFF_u32) as u8,
+                        255,
+                    ),
+                );
             }
-
-            renderer.draw_player(draw_x, draw_y, color);
         }
-        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss);
+
+        // Draw network stats
+        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss, is_connected);
 
         next_frame().await;
-    }
-}
-
-fn apply_input_to_position(pos: &mut Position, input: PlayerInput, _dt: f32) {
-    use netcode_game::constants::PLAYER_SPEED;
-    match input.dir {
-        Direction::Up => pos.y = pos.y.saturating_sub(PLAYER_SPEED),
-        Direction::Down => pos.y = pos.y.saturating_add(PLAYER_SPEED),
-        Direction::Left => pos.x = pos.x.saturating_sub(PLAYER_SPEED),
-        Direction::Right => pos.x = pos.x.saturating_add(PLAYER_SPEED),
     }
 }

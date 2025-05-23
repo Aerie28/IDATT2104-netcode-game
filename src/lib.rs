@@ -1,8 +1,10 @@
-pub mod network;
-pub mod render;
 pub mod types;
+pub mod network;
 pub mod game;
-pub mod config;
 pub mod input;
+pub mod render;
 pub mod colors;
 pub mod constants;
+pub mod config;
+pub mod prediction;
+pub mod interpolation;

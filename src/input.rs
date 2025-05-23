@@ -1,8 +1,9 @@
 use macroquad::prelude::*;
 use std::collections::HashMap;
-use crate::types::{PlayerInput, Direction, Position, PredictionState};
+use crate::types::{PlayerInput, Direction, Position};
 use crate::network::NetworkClient;
-use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, PLAYER_SPEED, DELAY_MS, PACKET_LOSS};
+use crate::constants::{INITIAL_DELAY, REPEAT_START, REPEAT_MIN, REPEAT_ACCEL, DELAY_MS, PACKET_LOSS};
+use crate::prediction::PredictionState;
 
 pub struct InputHandler {
     key_timers: HashMap<KeyCode, f32>,
@@ -51,7 +52,7 @@ impl InputHandler {
                 self.key_timers.insert(key, INITIAL_DELAY);
                 self.key_states.insert(key, true);
 
-                // Send input immediately
+                // Create and send input
                 let dir = match key {
                     KeyCode::W => Direction::Up,
                     KeyCode::A => Direction::Left,
@@ -63,18 +64,18 @@ impl InputHandler {
                 let input = PlayerInput {
                     dir,
                     sequence: prediction.next_sequence,
+                    timestamp: get_time() as u64,
                 };
-                prediction.pending_inputs.push_back((prediction.next_sequence, input));
-                prediction.next_sequence += 1;
-                net.send_input(input);
 
-                // Predict movement
-                match dir {
-                    Direction::Up => my_pos.y = my_pos.y.saturating_sub(PLAYER_SPEED),
-                    Direction::Down => my_pos.y = my_pos.y.saturating_add(PLAYER_SPEED),
-                    Direction::Left => my_pos.x = my_pos.x.saturating_sub(PLAYER_SPEED),
-                    Direction::Right => my_pos.x = my_pos.x.saturating_add(PLAYER_SPEED),
-                }
+                // Store input for prediction
+                prediction.pending_inputs.push_back((prediction.next_sequence, input.clone()));
+                prediction.next_sequence += 1;
+
+                // Send to server
+                net.send_input(input.clone());
+
+                // Apply prediction locally
+                prediction.apply_prediction(input, my_pos);
             } else if is_down && was_down {
                 // Key is still down, update timer
                 let timer = self.key_timers.entry(key).or_insert(INITIAL_DELAY);
@@ -85,7 +86,7 @@ impl InputHandler {
                     let next_interval = (*timer + REPEAT_START) * REPEAT_ACCEL;
                     *timer = next_interval.max(REPEAT_MIN);
 
-                    // Send input immediately
+                    // Create and send input
                     let dir = match key {
                         KeyCode::W => Direction::Up,
                         KeyCode::A => Direction::Left,
@@ -97,18 +98,18 @@ impl InputHandler {
                     let input = PlayerInput {
                         dir,
                         sequence: prediction.next_sequence,
+                        timestamp: get_time() as u64,
                     };
-                    prediction.pending_inputs.push_back((prediction.next_sequence, input));
-                    prediction.next_sequence += 1;
-                    net.send_input(input);
 
-                    // Predict movement
-                    match dir {
-                        Direction::Up => my_pos.y = my_pos.y.saturating_sub(PLAYER_SPEED),
-                        Direction::Down => my_pos.y = my_pos.y.saturating_add(PLAYER_SPEED),
-                        Direction::Left => my_pos.x = my_pos.x.saturating_sub(PLAYER_SPEED),
-                        Direction::Right => my_pos.x = my_pos.x.saturating_add(PLAYER_SPEED),
-                    }
+                    // Store input for prediction
+                    prediction.pending_inputs.push_back((prediction.next_sequence, input.clone()));
+                    prediction.next_sequence += 1;
+
+                    // Send to server
+                    net.send_input(input.clone());
+
+                    // Apply prediction locally
+                    prediction.apply_prediction(input, my_pos);
                 }
             } else if !is_down && was_down {
                 // Key released: reset state
