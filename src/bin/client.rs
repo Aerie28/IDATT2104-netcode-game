@@ -1,4 +1,5 @@
 use macroquad::prelude::*;
+use miniquad::*;
 use uuid::Uuid;
 use std::collections::HashMap;
 use netcode_game::render::Renderer;
@@ -8,7 +9,8 @@ use netcode_game::types::{Position, ClientMessage};
 use netcode_game::config::config_window;
 use netcode_game::prediction::PredictionState;
 use netcode_game::interpolation::InterpolationState;
-use netcode_game::constants::{PREDICTION_ERROR_THRESHOLD, PING_INTERVAL};
+use netcode_game::analysis::PerformanceAnalyzer;
+use netcode_game::constants::{PREDICTION_ERROR_THRESHOLD, PING_INTERVAL, PERFORMANCE_TEST_FREQUENCY};
 use std::time::{Instant};
 
 #[macroquad::main(config_window)]
@@ -19,6 +21,7 @@ async fn main() {
     // Initialize helpers
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
+    let mut performance_analyzer = PerformanceAnalyzer::new(PERFORMANCE_TEST_FREQUENCY);
     let initial_position = Position { x: 320, y: 240 };
     let mut prediction = PredictionState::new(initial_position);
 
@@ -29,6 +32,10 @@ async fn main() {
     let mut prediction_errors: HashMap<Uuid, f32> = HashMap::new();
     let mut last_ping_time = Instant::now();
     let mut is_connected = true;
+
+    let original_delay = input_handler.delay_ms;
+    let original_loss = input_handler.packet_loss;
+    let mut is_testing = false;
     
     // Store previous state for reconnection
     let mut previous_id: Option<Uuid> = None;
@@ -123,6 +130,27 @@ async fn main() {
             }
         }
 
+        // Test performance analysis
+        if is_key_pressed(KeyCode::T) {
+            if is_testing {
+            } else {
+                // Reset analyzer before starting new tests
+                performance_analyzer.reset();
+                is_testing = start_next_test(&mut performance_analyzer, &mut input_handler);
+            }
+        }
+        if is_testing && performance_analyzer.is_test_complete() {
+            performance_analyzer.complete_current_test();
+            is_testing = start_next_test(&mut performance_analyzer, &mut input_handler);
+
+            if !is_testing {
+                // Testing complete, restore original settings
+                input_handler.delay_ms = original_delay;
+                input_handler.packet_loss = original_loss;
+                println!("{}", performance_analyzer.generate_report());
+            }
+        }
+
         renderer.clear();
 
         // Draw all players with interpolation
@@ -189,8 +217,21 @@ async fn main() {
         }
 
         // Draw network stats
-        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss, is_connected);
+        renderer.draw_tool_bar(input_handler.delay_ms, input_handler.packet_loss, is_connected, is_testing);
 
         next_frame().await;
+    }
+}
+fn start_next_test(
+    performance_analyzer: &mut PerformanceAnalyzer,
+    input_handler: &mut InputHandler,
+) -> bool {
+    if let Some(condition) = performance_analyzer.start_next_test() {
+        input_handler.delay_ms = condition.latency_ms;
+        input_handler.packet_loss = condition.packet_loss_percent;
+        println!("Testing condition: {}", condition.name);
+        true
+    } else {
+        false
     }
 }

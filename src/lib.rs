@@ -8,3 +8,4 @@ pub mod constants;
 pub mod config;
 pub mod prediction;
 pub mod interpolation;
+pub mod analysis;

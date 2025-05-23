@@ -1,5 +1,6 @@
 use image::imageops::FilterType;
 use miniquad::conf::{Conf, Icon};
+use crate::constants::{HIGH_DPI, WINDOW_HEIGHT, WINDOW_RESIZABLE, WINDOW_TITLE, WINDOW_WIDTH};
 
 pub fn config_window() -> Conf {
     let icon_bytes = include_bytes!("assets/icon.png");
@@ -16,9 +17,11 @@ pub fn config_window() -> Conf {
     };
 
     Conf {
-        window_title: "Netcode Game".to_string(),
-        window_width: 800,
-        window_height: 600,
+        window_title: WINDOW_TITLE.to_owned(),
+        window_width: WINDOW_WIDTH,
+        window_height: WINDOW_HEIGHT,
+        window_resizable: WINDOW_RESIZABLE,
+        high_dpi: HIGH_DPI,
         icon: Some(icon),
         ..Default::default()
     }
