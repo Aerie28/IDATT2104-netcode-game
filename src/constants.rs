@@ -6,16 +6,27 @@ pub const TIMEOUT: Duration = Duration::from_secs(5);
 /// Constants for the game state
 pub const INTERPOLATION_DELAY: f32 = 0.016;
 
+/// Constants for window size
+pub const WINDOW_TITLE: &str = "Netcode Game";
+pub const HIGH_DPI: bool = true;
+pub const WINDOW_RESIZABLE: bool = false;
+pub const WINDOW_WIDTH: i32 = 1024;
+pub const WINDOW_HEIGHT: i32 = 768;
+
 /// Constants for the board
-pub const BOARD_WIDTH: f32 = 640.0;
-pub const BOARD_HEIGHT: f32 = 480.0;
+pub const BOARD_WIDTH: i32 = 1024;
+pub const BOARD_HEIGHT: i32 = 768;
 
 /// Constants for the player
-pub const PLAYER_SIZE: f32 = 20.0;
+pub const PLAYER_SIZE: i32 = 20;
 pub const PLAYER_SPEED: i32 = 5;
 
 /// Constants for server
 pub const BROADCAST_INTERVAL: Duration = Duration::from_millis(16); // 60fps game state updates
+
+/// Constants for performance testing
+pub const TEST_DURATION: Duration = Duration::from_millis(1000);
+pub const PERFORMANCE_TEST_FREQUENCY: Duration = Duration::from_secs(10); // 10 seconds
 
 /// Constants for network
 pub const DELAY_MS: i32 = 0;
