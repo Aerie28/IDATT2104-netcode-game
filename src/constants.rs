@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 /// Constants for the game state
-pub const TIMEOUT: Duration = Duration::from_secs(5);
+pub const TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Constants for the game state
 pub const INTERPOLATION_DELAY: f32 = 0.016;

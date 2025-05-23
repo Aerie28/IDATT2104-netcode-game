@@ -17,7 +17,7 @@ pub fn config_window() -> Conf {
 
     Conf {
         window_title: "Netcode Game".to_string(),
-        window_width: 800,
+        window_width: 900,
         window_height: 600,
         icon: Some(icon),
         ..Default::default()

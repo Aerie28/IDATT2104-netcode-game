@@ -55,18 +55,26 @@ async fn main() {
                     previous_id = my_id;
                     previous_position = Some(my_pos);
                     
+                    // Send disconnect message and wait a bit to ensure it's received
                     net.send_disconnect();
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    
                     my_id = None;
                     all_players.clear();
                     interpolated_positions.clear();
                     prediction_errors.clear();
+                    prediction.reset(); // Reset prediction state
                 }
                 is_connected = false;
             } else {
                 // Reconnect
                 if let Some(prev_id) = previous_id {
-                    // Send reconnect message with previous ID
-                    net.send_reconnect(prev_id, previous_position.unwrap_or(initial_position));
+                    // Send reconnect message with previous ID and position
+                    let reconnect_pos = previous_position.unwrap_or(initial_position);
+                    net.send_reconnect(prev_id, reconnect_pos);
+                    // Reset local position to match server
+                    my_pos = reconnect_pos;
+                    prediction.reset_with_position(reconnect_pos); // Reset prediction with server position
                 } else {
                     net.send_connect();
                 }

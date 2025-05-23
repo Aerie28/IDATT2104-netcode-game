@@ -25,10 +25,11 @@ pub struct PlayerState {
 }
 
 /// Stores information about disconnected players
-struct DisconnectedPlayer {
-    position: Position,
-    color: u32,
-    disconnected_at: Instant,
+#[derive(Debug)]
+pub struct DisconnectedPlayer {
+    pub position: Position,
+    pub color: u32,
+    pub disconnected_at: Instant,
 }
 
 pub struct Game {
@@ -196,7 +197,12 @@ impl Game {
         // Check for players that haven't sent a ping in TIMEOUT duration
         for (addr, player) in self.players.iter() {
             if now.duration_since(player.last_active) >= TIMEOUT {
-                to_disconnect.push(*addr);
+                if let Some(id) = self.addr_to_id.get(addr) {
+                    // Check if player is already in disconnected_players
+                    if !self.disconnected_players.contains_key(id) {
+                        to_disconnect.push(*addr);
+                    }
+                }
             }
         }
         
@@ -217,12 +223,14 @@ impl Game {
     pub fn disconnect_player(&mut self, addr: &SocketAddr) {
         if let Some(id) = self.addr_to_id.remove(addr) {
             if let Some(player) = self.players.get(addr) {
-                // Store player info for grace period
-                self.disconnected_players.insert(id, DisconnectedPlayer {
-                    position: player.position,
-                    color: player.color,
-                    disconnected_at: Instant::now(),
-                });
+                // Store player info for grace period if not already stored
+                if !self.disconnected_players.contains_key(&id) {
+                    self.disconnected_players.insert(id, DisconnectedPlayer {
+                        position: player.position,
+                        color: player.color,
+                        disconnected_at: Instant::now(),
+                    });
+                }
             }
             self.id_to_addr.remove(&id);
             self.last_processed.remove(&id);
@@ -286,17 +294,27 @@ impl Game {
     }
 
     /// Mutable access to players (use only when necessary)
-    pub fn players_mut(&mut self) -> &mut HashMap<SocketAddr, PlayerState> {
+    pub fn get_players_mut(&mut self) -> &mut HashMap<SocketAddr, PlayerState> {
         &mut self.players
     }
 
     /// Get a reference to the address to ID mapping
-    pub fn addr_to_id(&self) -> &HashMap<SocketAddr, Uuid> {
+    pub fn get_addr_to_id(&self) -> &HashMap<SocketAddr, Uuid> {
         &self.addr_to_id
     }
     
     /// Get a reference to the ID to address mapping
-     pub fn id_to_addr(&self) -> &HashMap<Uuid, SocketAddr> {
+     pub fn get_id_to_addr(&self) -> &HashMap<Uuid, SocketAddr> {
         &self.id_to_addr
+    }
+    pub fn get_disconnected_players(&self) -> &HashMap<Uuid, DisconnectedPlayer> {
+        &self.disconnected_players
+    }
+    pub fn get_disconnected_at(&self, id: &Uuid) -> Option<&Instant> {
+        self.disconnected_players.get(id).map(|p| &p.disconnected_at)
+    }
+
+    pub fn get_disconnected_player(&self, id: &Uuid) -> Option<&DisconnectedPlayer> {
+        self.disconnected_players.get(id)
     }
 }

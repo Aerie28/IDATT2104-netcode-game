@@ -10,7 +10,7 @@ use bincode;
 
 use netcode_game::game::Game;
 use netcode_game::types::{ClientMessage, GameState};
-use netcode_game::constants::{BROADCAST_INTERVAL, PING_INTERVAL};
+use netcode_game::constants::{BROADCAST_INTERVAL, PING_INTERVAL, ID_GRACE_PERIOD};
 
 #[tokio::main]
 async fn main() {
@@ -101,10 +101,11 @@ async fn main() {
                             println!("Player {} connected from {}", id, addr);
                         }
                         ClientMessage::Reconnect(previous_id, position) => {
-                            // Check if the ID exists and is not currently in use
-                            if let Some(existing_addr) = game.id_to_addr().get(&previous_id) {
-                                if !game.players().contains_key(existing_addr) {
-                                    // ID exists but not in use, allow reconnection
+                            // Check if the ID exists in disconnected_players (within grace period)
+                            if let Some(disconnected) = game.get_disconnected_player(&previous_id) {
+                                // Check if the grace period has expired
+                                if Instant::now().duration_since(disconnected.disconnected_at) < ID_GRACE_PERIOD {
+                                    // ID exists and grace period not expired, allow reconnection
                                     game.reconnect_player(addr, previous_id, position);
                                     
                                     let id_msg = ClientMessage::PlayerId(previous_id);
@@ -123,12 +124,12 @@ async fn main() {
                                     
                                     println!("Player {} reconnected from {}", previous_id, addr);
                                 } else {
-                                    // ID is in use, treat as new connection
+                                    // Grace period expired, treat as new connection
                                     let id = game.connect_player(addr);
-                                    println!("Previous ID {} in use, assigned new ID {} to {}", previous_id, id, addr);
+                                    println!("Grace period expired for ID {}, assigned new ID {} to {}", previous_id, id, addr);
                                 }
                             } else {
-                                // ID doesn't exist, treat as new connection
+                                // ID not found in disconnected_players, treat as new connection
                                 let id = game.connect_player(addr);
                                 println!("Previous ID {} not found, assigned new ID {} to {}", previous_id, id, addr);
                             }
@@ -138,10 +139,13 @@ async fn main() {
                             game.update_inactive();
                         }
                         ClientMessage::Disconnect => {
-                            if let Some(id) = game.addr_to_id().get(&addr) {
+                            if let Some(id) = game.get_addr_to_id().get(&addr) {
                                 println!("Player {} disconnected gracefully", id);
+                                // Ensure the player is properly stored in disconnected_players
+                                if let Some(player) = game.players().get(&addr) {
+                                    game.disconnect_player(&addr);
+                                }
                             }
-                            game.disconnect_player(&addr);
                         }
                         ClientMessage::Ping(timestamp) => {
                             // Echo back the timestamp as a pong
@@ -150,7 +154,7 @@ async fn main() {
                             let _ = socket.send_to(&pong_payload, addr).await;
                             
                             // Update player's last active time
-                            if let Some(player) = game.players_mut().get_mut(&addr) {
+                            if let Some(player) = game.get_players_mut().get_mut(&addr) {
                                 player.last_active = Instant::now();
                             }
                         }

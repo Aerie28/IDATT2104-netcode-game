@@ -32,28 +32,16 @@ impl Renderer {
         let width = screen_width();
         let height = screen_height();
         draw_rectangle(0.0, height - bar_height, width, bar_height, bg_colors::DARK_GRAY);
+        let text = if is_connected { "Disconnect [R]" } else { "Connect [R]" };
         
         // Draw network stats
         draw_text(
-            &format!("Delay: {} ms  [V/B]   Packet Loss: {}%  [N/M]   Movement [W,A,S,D]", delay_ms, packet_loss),
+            &format!("Delay: {} ms  [V/B]   Packet Loss: {}%  [N/M]   Movement [W,A,S,D]   {}", delay_ms, packet_loss, text),
             20.0,
             height - bar_height / 2.0 + 10.0,
             24.0,
             bg_colors::WHITE,
         );
-
-        // Draw disconnect/reconnect text
-        let text = if is_connected { "Disconnect [R]" } else { "Connect [R]" };
-        let text_width = measure_text(text, None, 20, 1.0).width;
-        let text_x = width - text_width - 20.0;
-        let text_y = height - bar_height / 2.0 + 8.0;
         
-        draw_text(
-            text,
-            text_x,
-            text_y,
-            20.0,
-            bg_colors::WHITE,
-        );
     }
 }
