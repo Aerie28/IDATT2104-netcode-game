@@ -164,33 +164,10 @@ impl Game {
         }
     }
 
-    /// Check for collisions at a specific timestamp
-    pub fn check_collisions_at_time(&self, timestamp: u64) -> Vec<(Uuid, Uuid)> {
-        let mut collisions = Vec::new();
-        let player_ids: Vec<Uuid> = self.id_to_addr.keys().cloned().collect();
-
-        for i in 0..player_ids.len() {
-            for j in (i + 1)..player_ids.len() {
-                let id1 = &player_ids[i];
-                let id2 = &player_ids[j];
-
-                if let (Some(pos1), Some(pos2)) = (
-                    self.get_player_position_at_time(id1, timestamp),
-                    self.get_player_position_at_time(id2, timestamp),
-                ) {
-                    // Simple collision detection (players are considered colliding if they're at the same position)
-                    if pos1.x == pos2.x && pos1.y == pos2.y {
-                        collisions.push((*id1, *id2));
-                    }
-                }
-            }
-        }
-
-        collisions
-    }
+    
 
     /// Marks players inactive if timeout exceeded
-    pub fn update_inactive(&mut self) {
+    pub fn update_server_dropped(&mut self) {
         let now = Instant::now();
         let mut to_disconnect = Vec::new();
         
@@ -226,13 +203,23 @@ impl Game {
 
     /// Clean up expired disconnected players with explicit time
     pub fn cleanup_disconnected_with_time(&mut self, now: Instant) {
+        println!("Running cleanup of disconnected players at {:?}", now);
         let mut expired = Vec::new();
         
         // Find expired players
         for (id, player) in self.disconnected_players.iter() {
-            if now.duration_since(player.disconnected_at) >= ID_GRACE_PERIOD {
-                expired.push(*id);
-                println!("Player {} grace period expired at {:?}", id, now.duration_since(player.disconnected_at));
+            let duration = now.duration_since(player.disconnected_at);
+            println!("Checking player {}: disconnected for {:?}", id, duration);
+            if duration >= ID_GRACE_PERIOD {
+                // Double check that the player is not in active players
+                if !self.id_to_addr.contains_key(id) {
+                    expired.push(*id);
+                    println!("Player {} grace period expired at {:?}", id, duration);
+                } else {
+                    println!("Player {} is still active, skipping cleanup", id);
+                }
+            } else {
+                println!("Player {} still within grace period: {:?} remaining", id, ID_GRACE_PERIOD - duration);
             }
         }
         
@@ -241,11 +228,14 @@ impl Game {
             self.disconnected_players.remove(&id);
             println!("Removed expired disconnected player {}", id);
         }
+        println!("Cleanup complete. Remaining disconnected players: {:?}", self.disconnected_players.keys().collect::<Vec<_>>());
     }
 
     /// Remove player on disconnect
     pub fn disconnect_player(&mut self, addr: &SocketAddr) {
+        println!("Attempting to disconnect player at address {}", addr);
         if let Some(id) = self.addr_to_id.remove(addr) {
+            println!("Found player ID {} for address {}", id, addr);
             if let Some(player) = self.players.get(addr) {
                 let now = Instant::now();
                 // Store player info for grace period
@@ -255,24 +245,37 @@ impl Game {
                     disconnected_at: now,
                 });
                 println!("Stored disconnected player {} with position {:?} at {:?}", id, player.position, now);
+                println!("Current disconnected players after storing: {:?}", self.disconnected_players.keys().collect::<Vec<_>>());
+            } else {
+                println!("No player state found for address {}", addr);
             }
             self.id_to_addr.remove(&id);
             self.last_processed.remove(&id);
+            println!("Removed player {} from active mappings", id);
+        } else {
+            println!("No player ID found for address {}", addr);
         }
         self.players.remove(addr);
+        println!("Removed player from active players map");
     }
 
     /// Reconnect a player with their previous ID and position
     pub fn reconnect_player(&mut self, addr: SocketAddr, id: Uuid, position: Position) {
         let now = Instant::now();
+        println!("Attempting to reconnect player {} from address {}", id, addr);
+        println!("Current disconnected players: {:?}", self.disconnected_players.keys().collect::<Vec<_>>());
+        
         // Check if player was recently disconnected
         if let Some(disconnected) = self.disconnected_players.remove(&id) {
             let disconnect_duration = now.duration_since(disconnected.disconnected_at);
-            println!("Reconnecting player {} after {:?}", id, disconnect_duration);
+            println!("Found disconnected player {} after {:?}", id, disconnect_duration);
+            println!("Disconnected player position: {:?}", disconnected.position);
+            println!("Disconnected player color: {}", disconnected.color);
             
             // Update address mappings
             self.id_to_addr.insert(id, addr);
             self.addr_to_id.insert(addr, id);
+            println!("Updated address mappings for player {}", id);
 
             // Create position history with the reconnected position
             let mut position_history = Vec::with_capacity(MAX_POSITION_HISTORY);
@@ -291,6 +294,10 @@ impl Game {
                     position_history,
                 },
             );
+            println!("Successfully reconnected player {} at position {:?}", id, position);
+        } else {
+            println!("Failed to find disconnected player {} in disconnected_players map", id);
+            println!("Current disconnected players: {:?}", self.disconnected_players.keys().collect::<Vec<_>>());
         }
     }
 

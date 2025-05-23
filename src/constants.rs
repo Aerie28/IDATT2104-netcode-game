@@ -45,6 +45,6 @@ pub const PREDICTION_ERROR_THRESHOLD: f32 = 5.0;
 pub const MAX_INTERPOLATION_TIME: f32 = 0.1;
 
 /// Constants for player management
-pub const ID_GRACE_PERIOD: Duration = Duration::from_secs(60); // 30 seconds grace period for reconnection
+pub const ID_GRACE_PERIOD: Duration = Duration::from_secs(10); // 30 seconds grace period for reconnection
 
 

@@ -146,9 +146,17 @@ async fn main() {
 
             // Check for PlayerId message
             if let Some(msg) = net.try_receive_message() {
-                if let ClientMessage::PlayerId(id) = msg {
-                    my_id = Some(id);
-                    println!("Received player ID: {}", id);
+                match msg {
+                    ClientMessage::PlayerId(id) => {
+                        // Only update ID if we don't already have one
+                        if my_id.is_none() {
+                            my_id = Some(id);
+                            println!("Received player ID: {}", id);
+                        }
+                    }
+                    _ => {
+                        // Ignore other messages
+                    }
                 }
             }
         }

@@ -79,7 +79,7 @@ impl Renderer {
         };
 
         // Calculate spacing for right-aligned elements
-        let connect_text = if is_connected { "Disconnect [R]" } else { "Connect [R]" };
+        let connect_text = if is_connected { "Drop connection [R]" } else { "Reconnect [R]" };
         let connect_width = measure_text(connect_text, None, text_size as u16, 1.0).width;
         let test_text = "Test [T]";
         let test_width = measure_text(test_text, None, text_size as u16, 1.0).width;

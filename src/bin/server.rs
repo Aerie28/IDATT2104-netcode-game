@@ -1,7 +1,6 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
-use std::time::Duration;
 
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
@@ -11,7 +10,7 @@ use bincode;
 
 use netcode_game::game::Game;
 use netcode_game::types::{ClientMessage, GameState};
-use netcode_game::constants::{BROADCAST_INTERVAL, PING_INTERVAL, ID_GRACE_PERIOD};
+use netcode_game::constants::{BROADCAST_INTERVAL, ID_GRACE_PERIOD};
 
 #[tokio::main]
 async fn main() {
@@ -33,16 +32,10 @@ async fn main() {
             interval.tick().await;
 
             let mut game = game_clone.lock().await;
-            game.update_inactive();
-
-            // Check for collisions using lag compensation
-            let current_time = Instant::now().elapsed().as_millis() as u64;
-            let collisions = game.check_collisions_at_time(current_time);
+            game.update_server_dropped();
             
-            // Handle collisions (for now, just print them)
-            for (id1, id2) in collisions {
-                println!("Collision detected between players {} and {}", id1, id2);
-            }
+            let current_time = Instant::now().elapsed().as_millis() as u64;
+
 
             let snapshot = game.build_snapshot();
 
@@ -64,11 +57,12 @@ async fn main() {
     // Spawn a task to clean up expired disconnected players
     let game_clone = game.clone();
     tokio::spawn(async move {
-        let mut interval = time::interval(Duration::from_secs(1)); // Clean up every second
+        let mut interval = time::interval(ID_GRACE_PERIOD); // Clean up every grace period
         loop {
             interval.tick().await;
             let mut game = game_clone.lock().await;
             let now = Instant::now();
+            // Only clean up players that are not currently being reconnected
             game.cleanup_disconnected_with_time(now);
         }
     });
@@ -110,10 +104,6 @@ async fn main() {
                                     // ID exists and grace period not expired, allow reconnection
                                     game.reconnect_player(addr, previous_id, position);
                                     
-                                    let id_msg = ClientMessage::PlayerId(previous_id);
-                                    let id_payload = bincode::serialize(&id_msg).unwrap();
-                                    let _ = socket.send_to(&id_payload, addr).await;
-                                    
                                     // Send current game state
                                     let snapshot = game.build_snapshot();
                                     let game_state = GameState {
@@ -126,28 +116,29 @@ async fn main() {
                                     
                                     println!("Player {} reconnected from {}", previous_id, addr);
                                 } else {
-                                    // Grace period expired, treat as new connection
+                                    // Grace period expired, remove from disconnected_players and treat as new connection
+                                    game.cleanup_disconnected_with_time(Instant::now());
                                     let id = game.connect_player(addr);
+                                    let id_msg = ClientMessage::PlayerId(id);
+                                    let id_payload = bincode::serialize(&id_msg).unwrap();
+                                    let _ = socket.send_to(&id_payload, addr).await;
                                     println!("Grace period expired for ID {}, assigned new ID {} to {}", previous_id, id, addr);
                                 }
                             } else {
                                 // ID not found in disconnected_players, treat as new connection
                                 let id = game.connect_player(addr);
+                                let id_msg = ClientMessage::PlayerId(id);
+                                let id_payload = bincode::serialize(&id_msg).unwrap();
+                                let _ = socket.send_to(&id_payload, addr).await;
                                 println!("Previous ID {} not found in disconnected players, assigned new ID {} to {}", previous_id, id, addr);
                             }
                         }
                         ClientMessage::Input(input) => {
                             game.handle_input(addr, input);
-                            game.update_inactive();
+                            game.update_server_dropped();
                         }
                         ClientMessage::Disconnect => {
-                            if let Some(id) = game.get_addr_to_id().get(&addr) {
-                                println!("Player {} disconnected gracefully", id);
-                                // Ensure the player is properly stored in disconnected_players
-                                if let Some(player) = game.players().get(&addr) {
-                                    game.disconnect_player(&addr);
-                                }
-                            }
+                            game.disconnect_player(&addr);
                         }
                         ClientMessage::Ping(timestamp) => {
                             // Echo back the timestamp as a pong
@@ -177,22 +168,6 @@ async fn main() {
     }
 }
 
-/// Broadcast snapshot to all active players
-/**
-async fn broadcast_snapshot(
-    socket: &UdpSocket,
-    players: &std::collections::HashMap<SocketAddr, netcode_game::game::PlayerState>,
-    snapshot: &GameState,
-) {
-    let payload = bincode::serialize(snapshot).unwrap();
-
-    for (client_addr, player) in players {
-        if player.active {
-            let _ = socket.send_to(&payload, client_addr).await;
-        }
-    }
-}
-*/
 
 async fn broadcast_snapshot_to_selected(
     socket: &UdpSocket,
