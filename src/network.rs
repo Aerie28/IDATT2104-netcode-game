@@ -37,17 +37,7 @@ impl NetworkClient {
         let _ = self.socket.send_to(&data, &self.server_addr);
     }
     
-    pub fn send_disconnect(&self) {
-        let msg = ClientMessage::Disconnect;
-        let data = bincode::serialize(&msg).unwrap();
-        let _ = self.socket.send_to(&data, &self.server_addr);
-    }
-
-    pub fn send_reconnect(&self, previous_id: Uuid, position: Position) {
-        let msg = ClientMessage::Reconnect(previous_id, position);
-        let data = bincode::serialize(&msg).unwrap();
-        let _ = self.socket.send_to(&data, &self.server_addr);
-    }
+    
 
     pub fn send_ping(&self, timestamp: u64) {
         let msg = ClientMessage::Ping(timestamp);
@@ -106,14 +96,7 @@ impl NetworkClient {
             None
         }
     }
-
-    pub fn set_client_addr(&mut self, addr: SocketAddr) {
-        self.client_addr = Some(addr);
-    }
-
-    pub fn client_addr(&self) -> Option<SocketAddr> {
-        self.client_addr
-    }
+    
 
     fn simulate_network_conditions(&self) -> bool {
         // Simulate packet loss

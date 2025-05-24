@@ -32,58 +32,36 @@ async fn main() {
     let mut prediction_errors: HashMap<Uuid, f32> = HashMap::new();
     let mut last_ping_time = Instant::now();
     let mut is_connected = true;
+    let mut should_send_pings = true;
 
     let original_delay = input_handler.delay_ms;
     let original_loss = input_handler.packet_loss;
     let mut is_testing = false;
     
-    // Store previous state for reconnection
-    let mut previous_id: Option<Uuid> = None;
-    let mut previous_position: Option<Position> = None;
-    
     loop {
-        // Check if window is being closed
-        if is_quit_requested() {
-            // Send disconnect message before closing
-            if my_id.is_some() {
-                net.send_disconnect();
-            }
-            break;
-        }
-
         let current_time = get_time();
         
         // Handle disconnect/reconnect
         if is_key_pressed(KeyCode::R) {
             if is_connected {
-                // Disconnect
-                if my_id.is_some() {
-                    // Store current state before disconnecting
-                    previous_id = my_id;
-                    previous_position = Some(my_pos);
-                    
-                    net.send_disconnect();
-                    my_id = None;
-                    all_players.clear();
-                    interpolated_positions.clear();
-                    prediction_errors.clear();
-                }
+                // Stop sending pings to trigger timeout disconnect
+                println!("Stopping ping messages to trigger timeout disconnect...");
+                should_send_pings = false;
                 is_connected = false;
             } else {
-                // Reconnect
-                if let Some(prev_id) = previous_id {
-                    // Send reconnect message with previous ID
-                    net.send_reconnect(prev_id, previous_position.unwrap_or(initial_position));
-                } else {
-                    net.send_connect();
-                }
+                // Connect
+                println!("Starting connect process...");
+                let start = Instant::now();
+                net.send_connect();
+                should_send_pings = true;
                 is_connected = true;
             }
         }
         
-        // Send periodic ping if connected
-        if is_connected && last_ping_time.elapsed() >= PING_INTERVAL {
-            net.send_ping(current_time as u64);
+        // Send periodic ping if connected and pings are enabled
+        if is_connected && should_send_pings && last_ping_time.elapsed() >= PING_INTERVAL {
+            let current_time = get_time();
+            net.send_ping((current_time * 1000.0) as u64); // Convert to milliseconds
             last_ping_time = Instant::now();
         }
         
@@ -96,6 +74,20 @@ async fn main() {
 
             // Receive and process game state from server
             if let Some(game_state) = net.try_receive_snapshot() {
+                let current_time = get_time();
+                let server_time = game_state.server_timestamp as f64 / 1000.0; // Convert from milliseconds to seconds
+                let time_diff = current_time - server_time;
+                
+                // Create a set of current player IDs from the server
+                let current_player_ids: std::collections::HashSet<Uuid> = game_state.players.iter()
+                    .map(|(id, _, _)| *id)
+                    .collect();
+
+                // Remove players that are no longer in the game state
+                all_players.retain(|id, _| current_player_ids.contains(id));
+                interpolated_positions.retain(|id, _| current_player_ids.contains(id));
+                prediction_errors.retain(|id, _| current_player_ids.contains(id));
+
                 // Update interpolation states for other players
                 for (id, pos, _color) in &game_state.players {
                     if Some(*id) != my_id {
@@ -123,9 +115,17 @@ async fn main() {
 
             // Check for PlayerId message
             if let Some(msg) = net.try_receive_message() {
-                if let ClientMessage::PlayerId(id) = msg {
-                    my_id = Some(id);
-                    println!("Received player ID: {}", id);
+                match msg {
+                    ClientMessage::PlayerId(id) => {
+                        // Only update ID if we don't already have one
+                        if my_id.is_none() {
+                            my_id = Some(id);
+                            println!("Received player ID: {}", id);
+                        }
+                    }
+                    _ => {
+                        // Ignore other messages
+                    }
                 }
             }
         }
@@ -170,7 +170,7 @@ async fn main() {
                             ),
                         );
                     } else {
-                        // If we don't have enough positions for interpolation, use the current position
+                        // Fallback to current position if no interpolation data
                         renderer.draw_player(
                             pos.x as f32,
                             pos.y as f32,
@@ -179,9 +179,21 @@ async fn main() {
                                 ((color >> 8) & 0xFF_u32) as u8,
                                 (color & 0xFF_u32) as u8,
                                 255,
-                            )
+                            ),
                         );
                     }
+                } else {
+                    // Fallback to current position if no interpolation data
+                    renderer.draw_player(
+                        pos.x as f32,
+                        pos.y as f32,
+                        Color::from_rgba(
+                            ((color >> 16) & 0xFF_u32) as u8,
+                            ((color >> 8) & 0xFF_u32) as u8,
+                            (color & 0xFF_u32) as u8,
+                            255,
+                        ),
+                    );
                 }
             } else {
                 // Draw local player with prediction error visualization
@@ -222,6 +234,7 @@ async fn main() {
         next_frame().await;
     }
 }
+
 fn start_next_test(
     performance_analyzer: &mut PerformanceAnalyzer,
     input_handler: &mut InputHandler,
