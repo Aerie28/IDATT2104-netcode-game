@@ -1,12 +1,9 @@
-use uuid::Uuid;
-use std::{
-    collections::HashMap,
-    net::SocketAddr,
-    time::Instant,
-};
 use crate::colors::player_colors;
-use crate::types::{Position, PlayerInput, Direction, GameState, PositionSnapshot};
 use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, PLAYER_SIZE, TOOL_BAR_HEIGHT};
+use crate::types::{Position, PlayerInput, Direction, GameState, PositionSnapshot};
+
+use std::{collections::HashMap, net::SocketAddr, time::Instant};
+use uuid::Uuid;
 
 const MAX_POSITION_HISTORY: usize = 60; // Store 1 second of history at 60fps
 
@@ -19,6 +16,7 @@ pub struct PlayerState {
     pub position_history: Vec<PositionSnapshot>,
 }
 
+/// Game state that tracks all players and their positions, and ids for the players
 pub struct Game {
     players: HashMap<SocketAddr, PlayerState>,
     id_to_addr: HashMap<Uuid, SocketAddr>,
@@ -26,7 +24,9 @@ pub struct Game {
     last_processed: HashMap<Uuid, u32>, // Track inputs
 }
 
+/// Implementation of the Game state
 impl Game {
+    /// Creates a new Game instance
     pub fn new() -> Self {
         Self {
             players: HashMap::new(),
@@ -40,14 +40,16 @@ impl Game {
     pub fn connect_player(&mut self, addr: SocketAddr) -> Uuid {
         use rand::Rng;
 
+        // Check if player already connected
         if self.players.contains_key(&addr) {
             // Player already connected
             return *self.addr_to_id.get(&addr).unwrap();
         }
 
+        // Generate a random position within the board bounds
         let mut rng = rand::rng();
-        let x = rng.random_range((PLAYER_SIZE)..(BOARD_WIDTH - (PLAYER_SIZE)));
-        let y = rng.random_range((PLAYER_SIZE)..(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT));
+        let x = rng.random_range(PLAYER_SIZE..(BOARD_WIDTH - (PLAYER_SIZE)));
+        let y = rng.random_range(PLAYER_SIZE..(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT));
         
         // Pick a color from the palette randomly
         let palette = player_colors::get_palette();
@@ -62,6 +64,7 @@ impl Game {
         self.id_to_addr.insert(id, addr);
         self.addr_to_id.insert(addr, id);
 
+        // Initialize player position and history
         let initial_position = Position { x, y };
         let mut position_history = Vec::with_capacity(MAX_POSITION_HISTORY);
         position_history.push(PositionSnapshot {
@@ -69,6 +72,7 @@ impl Game {
             timestamp: Instant::now().elapsed().as_millis() as u64,
         });
 
+        // Insert the player state into the game
         self.players.insert(
             addr,
             PlayerState {
@@ -91,11 +95,12 @@ impl Game {
                 self.last_processed.insert(*id, input.sequence);
             }
 
+            // Update player position based on input direction for prediction
             match input.dir {
-                Direction::Up => player.position.y = (player.position.y.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
-                Direction::Down => player.position.y = (player.position.y.saturating_add(PLAYER_SPEED)).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
-                Direction::Left => player.position.x = (player.position.x.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
-                Direction::Right => player.position.x = (player.position.x.saturating_add(PLAYER_SPEED)).min(BOARD_WIDTH - (PLAYER_SIZE)),
+                Direction::Up => player.position.y = player.position.y.saturating_sub(PLAYER_SPEED).max(PLAYER_SIZE),
+                Direction::Down => player.position.y = player.position.y.saturating_add(PLAYER_SPEED).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
+                Direction::Left => player.position.x = player.position.x.saturating_sub(PLAYER_SPEED).max(PLAYER_SIZE),
+                Direction::Right => player.position.x = player.position.x.saturating_add(PLAYER_SPEED).min(BOARD_WIDTH - (PLAYER_SIZE)),
             }
 
             // Store current position in history
@@ -133,6 +138,7 @@ impl Game {
         }
     }
 
+    /// Get player address of active player
     pub fn active_player_addrs(&self) -> Vec<SocketAddr> {
         self.players.keys().cloned().collect()
     }

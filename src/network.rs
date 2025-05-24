@@ -1,12 +1,16 @@
-use crate::types::{ClientMessage, PlayerInput, GameState};
-use std::net::{ UdpSocket};
-use std::time::{Duration, Instant};
 use bincode;
+
+use crate::types::{ClientMessage, PlayerInput, GameState};
+use crate::constants::{DELAY_MS, PACKET_LOSS};
+
 use rand::Rng;
 use rand::seq::SliceRandom;
-use crate::constants::{DELAY_MS, PACKET_LOSS};
-use std::collections::VecDeque;
 
+use std::collections::VecDeque;
+use std::net::UdpSocket;
+use std::time::{Duration, Instant};
+
+/// Network client that handles sending and receiving messages with simulated network conditions
 pub struct NetworkClient {
     pub socket: UdpSocket,
     server_addr: String,
@@ -15,7 +19,9 @@ pub struct NetworkClient {
     delayed_packets: VecDeque<(Vec<u8>, Instant, u32, i32)>, // (data, send_time, sequence, delay)
 }
 
+/// Implementation of the NetworkClient
 impl NetworkClient {
+    /// Creates a new NetworkClient bound to the specified server address
     pub fn new(server_addr: &str) -> Self {
         let socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to bind UDP socket");
         socket.set_nonblocking(true).expect("Failed to set non-blocking");
@@ -27,20 +33,22 @@ impl NetworkClient {
             delayed_packets: VecDeque::new(),
         }
     }
+    
+    /// Connects to the server by sending a connect message
     pub fn send_connect(&self) {
         let msg = ClientMessage::Connect;
         let data = bincode::serialize(&msg).unwrap();
         let _ = self.socket.send_to(&data, &self.server_addr);
     }
     
-    
-
+    /// Sends a ping message with the current timestamp
     pub fn send_ping(&self, timestamp: u64) {
         let msg = ClientMessage::Ping(timestamp);
         let data = bincode::serialize(&msg).unwrap();
         let _ = self.socket.send_to(&data, &self.server_addr);
     }
 
+    /// Sends a player input message with the specified input
     pub fn send_input(&mut self, input: PlayerInput) {
         if self.simulate_network_conditions() {
             // Drop the packet (simulate loss)
@@ -59,46 +67,23 @@ impl NetworkClient {
         }
     }
 
+    /// Tries to receive a game state snapshot from the server
     pub fn try_receive_snapshot(&mut self) -> Option<GameState> {
-        // Process delayed packets
-        self.process_delayed_packets();
-
-        if self.simulate_network_conditions() {
-            // Drop the packet (simulate loss)
-            return None;
-        }
-
-        let mut buf = [0u8; 2048];
-        if let Ok((size, _)) = self.socket.recv_from(&mut buf) {
-            bincode::deserialize(&buf[..size]).ok()
-        } else {
-            None
-        }
+        self.receive_data()
     }
 
+    /// Tries to receive a client message from the server
     pub fn try_receive_message(&mut self) -> Option<ClientMessage> {
-        // Process delayed packets
-        self.process_delayed_packets();
-
-        if self.simulate_network_conditions() {
-            // Drop the packet (simulate loss)
-            return None;
-        }
-
-        let mut buf = [0u8; 2048];
-        if let Ok((size, _)) = self.socket.recv_from(&mut buf) {
-            bincode::deserialize(&buf[..size]).ok()
-        } else {
-            None
-        }
+        self.receive_data()
     }
     
-
+    /// Simulates network conditions like packet loss
     fn simulate_network_conditions(&self) -> bool {
         // Simulate packet loss
         rand::rng().random_bool(self.packet_loss as f64 / 100.0)
     }
 
+    /// Processes delayed packets and sends them when their delay has elapsed
     fn process_delayed_packets(&mut self) {
         let now = Instant::now();
         let mut ready_packets: Vec<(Vec<u8>, u32)> = Vec::new();
@@ -122,6 +107,24 @@ impl NetworkClient {
             for (data, _) in ready_packets {
                 let _ = self.socket.send_to(&data, &self.server_addr);
             }
+        }
+    }
+
+    /// Receives data from the server for game state or client messages
+    fn receive_data<T: serde::de::DeserializeOwned>(&mut self) -> Option<T> {
+        // Process delayed packets
+        self.process_delayed_packets();
+
+        if self.simulate_network_conditions() {
+            // Drop the packet (simulate loss)
+            return None;
+        }
+
+        let mut buf = [0u8; 2048];
+        if let Ok((size, _)) = self.socket.recv_from(&mut buf) {
+            bincode::deserialize(&buf[..size]).ok()
+        } else {
+            None
         }
     }
 }

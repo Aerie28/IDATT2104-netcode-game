@@ -1,8 +1,9 @@
-use std::collections::VecDeque;
 use crate::types::{InterpolatedPosition, Position};
 use crate::constants::{INTERPOLATION_DELAY, MAX_POSITION_HISTORY};
 
+use std::collections::VecDeque;
 
+/// Represents a position with a timestamp and sequence number for interpolation
 pub struct InterpolationState {
     position_history: VecDeque<InterpolatedPosition>,
     interpolation_delay: f32,
@@ -10,7 +11,9 @@ pub struct InterpolationState {
     last_position: Option<Position>,
 }
 
+/// Implementation of the InterpolationState
 impl InterpolationState {
+    /// Creates a new InterpolationState with default values
     pub fn new() -> Self {
         Self {
             position_history: VecDeque::with_capacity(MAX_POSITION_HISTORY),
@@ -20,6 +23,7 @@ impl InterpolationState {
         }
     }
 
+    /// Function to add a new position to the history
     pub fn add_position(&mut self, position: Position, timestamp: f32, sequence: u32) {
         // Skip if we already have this sequence
         if sequence <= self.last_sequence {
@@ -42,6 +46,7 @@ impl InterpolationState {
         self.last_position = Some(position);
     }
 
+    /// Function to get the interpolated position based on the current time
     pub fn get_interpolated_position(&self, current_time: f32) -> Option<Position> {
         if self.position_history.len() < 2 {
             return self.last_position;
@@ -79,5 +84,4 @@ impl InterpolationState {
             (None, None) => self.last_position,
         }
     }
-
 } 

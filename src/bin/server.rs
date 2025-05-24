@@ -1,3 +1,9 @@
+use bincode;
+
+use netcode_game::constants::BROADCAST_INTERVAL;
+use netcode_game::game::Game;
+use netcode_game::types::{ClientMessage, GameState};
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Instant;
@@ -6,14 +12,10 @@ use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio::time;
 
-use bincode;
-
-use netcode_game::game::Game;
-use netcode_game::types::{ClientMessage, GameState};
-use netcode_game::constants::BROADCAST_INTERVAL;
-
+/// Server main function using Tokio for async I/O
 #[tokio::main]
 async fn main() {
+    // Bind the UDP socket to the specified address and start the server
     let socket = Arc::new(UdpSocket::bind("0.0.0.0:9000").await.unwrap());
     println!("Server running on {}", socket.local_addr().unwrap());
 
@@ -107,12 +109,13 @@ async fn main() {
                 }
             }
             Err(_e) => {
-                //eprintln!("recv_from error: {:?}", e);
+                // Handle errors (e.g., log them)
             }
         }
     }
 }
 
+/// Broadcasts the game state snapshot to all active players
 async fn broadcast_snapshot_to_selected(
     socket: &UdpSocket,
     active_players: &[SocketAddr],

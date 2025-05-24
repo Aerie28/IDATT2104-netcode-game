@@ -1,9 +1,10 @@
-// src/analysis.rs
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
 use crate::constants::{TEST_DURATION};
 use crate::types::NetworkCondition;
 
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+
+/// Represents performance metrics for a network condition
 pub struct PerformanceMetrics {
     pub avg_prediction_error: f32,
     pub max_prediction_error: f32,
@@ -11,6 +12,7 @@ pub struct PerformanceMetrics {
     pub input_lag_ms: i32,
 }
 
+/// Analyzes performance metrics under different network conditions
 pub struct PerformanceAnalyzer {
     conditions: Vec<NetworkCondition>,
     results: HashMap<String, PerformanceMetrics>,
@@ -20,8 +22,10 @@ pub struct PerformanceAnalyzer {
     start_time: Instant,
 }
 
+/// Implementation of the PerformanceAnalyzer
 impl PerformanceAnalyzer {
-    pub fn new(sample_duration: Duration) -> Self {
+    /// Creates a new PerformanceAnalyzer with predefined network conditions for testing
+    pub fn new(_sample_duration: Duration) -> Self {
         Self {
             conditions: vec![
                 NetworkCondition { latency_ms: 200, packet_loss_percent: 10, name: "Very Poor".to_string() },
@@ -39,6 +43,7 @@ impl PerformanceAnalyzer {
         }
     }
 
+    /// Creates a new PerformanceAnalyzer with a custom set of network conditions
     pub fn start_next_test(&mut self) -> Option<NetworkCondition> {
         if self.current_index < self.conditions.len() {
             let condition = self.conditions[self.current_index].clone();
@@ -51,13 +56,15 @@ impl PerformanceAnalyzer {
             None
         }
     }
-
+    
+    /// Records a prediction error for the current network condition
     pub fn record_prediction_error(&mut self, error: f32) {
         if self.current_condition.is_some() {
             self.samples.push(error);
         }
     }
 
+    /// Resets the analyzer to start a new test
     pub fn reset(&mut self) {
         self.current_index = 0;
         self.results.clear();
@@ -65,6 +72,7 @@ impl PerformanceAnalyzer {
         self.samples.clear();
     }
 
+    /// Checks if the current test is complete based on elapsed time
     pub fn is_test_complete(&self) -> bool {
         if self.current_condition.is_none() {
             return false;
@@ -73,6 +81,7 @@ impl PerformanceAnalyzer {
         self.start_time.elapsed() >= TEST_DURATION
     }
 
+    /// Completes the current test and calculates performance metrics
     pub fn complete_current_test(&mut self) {
         if let Some(condition) = &self.current_condition {
             let avg_error = if self.samples.is_empty() {
@@ -92,6 +101,7 @@ impl PerformanceAnalyzer {
         }
     }
 
+    /// Returns the results of the performance tests
     pub fn generate_report(&self) -> String {
         let mut report = "# Performance Analysis Report\n\n".to_string();
         report.push_str("| Network Condition | Avg Error | Max Error | Input Lag |\n");

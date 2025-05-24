@@ -1,7 +1,9 @@
-use std::collections::VecDeque;
-use crate::types::{Position, PlayerInput, Direction};
 use crate::constants::{BOARD_HEIGHT, BOARD_WIDTH, PLAYER_SIZE, PLAYER_SPEED, TOOL_BAR_HEIGHT};
+use crate::types::{Position, PlayerInput, Direction};
 
+use std::collections::VecDeque;
+
+/// Represents the state of player movement prediction and reconciliation
 pub struct PredictionState {
     pub next_sequence: u32,
     pub pending_inputs: VecDeque<(u32, PlayerInput)>,
@@ -11,7 +13,9 @@ pub struct PredictionState {
     pub last_reconciliation_time: f64,
 }
 
+/// Implementation of the PredictionState
 impl PredictionState {
+    /// Creates a new PredictionState with the initial position
     pub fn new(initial_position: Position) -> Self {
         Self {
             next_sequence: 0,
@@ -23,19 +27,21 @@ impl PredictionState {
         }
     }
 
+    /// Adds a prediction input to the pending inputs queue
     pub fn apply_prediction(&mut self, input: PlayerInput, current_position: &mut Position) {
         // Store the current position before applying the prediction
         self.position_history.push_back((input.sequence, *current_position));
         
         // Apply the movement prediction
         match input.dir {
-            Direction::Up => current_position.y = (current_position.y.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
-            Direction::Down => current_position.y = (current_position.y.saturating_add(PLAYER_SPEED)).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
-            Direction::Left => current_position.x = (current_position.x.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
-            Direction::Right => current_position.x = (current_position.x.saturating_add(PLAYER_SPEED)).min(BOARD_WIDTH - (PLAYER_SIZE)),
+            Direction::Up => current_position.y = current_position.y.saturating_sub(PLAYER_SPEED).max(PLAYER_SIZE),
+            Direction::Down => current_position.y = current_position.y.saturating_add(PLAYER_SPEED).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
+            Direction::Left => current_position.x = current_position.x.saturating_sub(PLAYER_SPEED).max(PLAYER_SIZE),
+            Direction::Right => current_position.x = current_position.x.saturating_add(PLAYER_SPEED).min(BOARD_WIDTH - (PLAYER_SIZE)),
         }
     }
 
+    /// Reconciles the client state with the server state
     pub fn reconcile(&mut self, server_position: Position, server_sequence: u32, current_time: f64) {
         // If we've received a newer server state
         if server_sequence > self.last_confirmed_sequence {
@@ -75,6 +81,7 @@ impl PredictionState {
         }
     }
 
+    /// Reapplies all pending inputs to the current position
     pub fn reapply_pending_inputs(&mut self, current_position: &mut Position) {
         // Start from the last confirmed position
         *current_position = self.last_confirmed_position;
@@ -88,11 +95,10 @@ impl PredictionState {
         }
     }
 
+    /// Gets error in prediction by comparing the last confirmed position with the server position
     pub fn get_prediction_error(&self, server_position: Position) -> f32 {
         let dx = (server_position.x - self.last_confirmed_position.x) as f32;
         let dy = (server_position.y - self.last_confirmed_position.y) as f32;
         (dx * dx + dy * dy).sqrt()
     }
-    
-    
 } 
