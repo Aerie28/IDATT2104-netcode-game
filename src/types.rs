@@ -7,10 +7,8 @@ pub enum ClientMessage {
     Connect,
     PlayerId(Uuid),
     Input(PlayerInput),
-    Disconnect,
     Ping(u64),  // Client sends timestamp
     Pong(u64),  // Server echoes timestamp
-    Reconnect(Uuid, Position), // Previous ID and position
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]

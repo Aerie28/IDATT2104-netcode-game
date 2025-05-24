@@ -32,93 +32,34 @@ async fn main() {
     let mut prediction_errors: HashMap<Uuid, f32> = HashMap::new();
     let mut last_ping_time = Instant::now();
     let mut is_connected = true;
+    let mut should_send_pings = true;
 
     let original_delay = input_handler.delay_ms;
     let original_loss = input_handler.packet_loss;
     let mut is_testing = false;
     
-    // Store previous state for reconnection
-    let mut previous_id: Option<Uuid> = None;
-    let mut previous_position: Option<Position> = None;
-    
     loop {
-        // Check if window is being closed
-        if is_quit_requested() {
-            // Send disconnect message before closing
-            if my_id.is_some() {
-                net.send_disconnect();
-            }
-            break;
-        }
-
         let current_time = get_time();
         
         // Handle disconnect/reconnect
         if is_key_pressed(KeyCode::R) {
             if is_connected {
-                // Disconnect
-                if my_id.is_some() {
-                    println!("Starting disconnect process...");
-                    let start = Instant::now();
-                    
-                    // Store current state before disconnecting
-                    previous_id = my_id;
-                    previous_position = Some(my_pos);
-                    
-                    // Send disconnect message and wait for acknowledgment
-                    println!("Sending disconnect message...");
-                    net.send_disconnect();
-                    
-                    // Wait for acknowledgment (Pong message)
-                    let mut ack_received = false;
-                    let start_wait = Instant::now();
-                    println!("Waiting for disconnect acknowledgment...");
-                    while !ack_received && start_wait.elapsed() < std::time::Duration::from_millis(500) {
-                        if let Some(msg) = net.try_receive_message() {
-                            if let ClientMessage::Pong(_) = msg {
-                                ack_received = true;
-                                println!("Received disconnect acknowledgment after {:?}", start_wait.elapsed());
-                            }
-                        }
-                        std::thread::sleep(std::time::Duration::from_millis(10));
-                    }
-                    
-                    if !ack_received {
-                        println!("Warning: Did not receive disconnect acknowledgment within timeout");
-                    }
-                    
-                    my_id = None;
-                    all_players.clear();
-                    interpolated_positions.clear();
-                    prediction_errors.clear();
-                    prediction.reset(); // Reset prediction state
-                    println!("Disconnect process completed in {:?}", start.elapsed());
-                }
+                // Stop sending pings to trigger timeout disconnect
+                println!("Stopping ping messages to trigger timeout disconnect...");
+                should_send_pings = false;
                 is_connected = false;
             } else {
-                // Reconnect
-                println!("Starting reconnect process...");
+                // Connect
+                println!("Starting connect process...");
                 let start = Instant::now();
-                
-                if let Some(prev_id) = previous_id {
-                    // Send reconnect message with previous ID and position
-                    let reconnect_pos = previous_position.unwrap_or(initial_position);
-                    println!("Sending reconnect message for ID {}...", prev_id);
-                    net.send_reconnect(prev_id, reconnect_pos);
-                    // Reset local position to match server
-                    my_pos = reconnect_pos;
-                    prediction.reset_with_position(reconnect_pos); // Reset prediction with server position
-                } else {
-                    println!("No previous ID, sending new connection request...");
-                    net.send_connect();
-                }
+                net.send_connect();
+                should_send_pings = true;
                 is_connected = true;
-                println!("Reconnect process initiated in {:?}", start.elapsed());
             }
         }
         
-        // Send periodic ping if connected
-        if is_connected && last_ping_time.elapsed() >= PING_INTERVAL {
+        // Send periodic ping if connected and pings are enabled
+        if is_connected && should_send_pings && last_ping_time.elapsed() >= PING_INTERVAL {
             let current_time = get_time();
             net.send_ping((current_time * 1000.0) as u64); // Convert to milliseconds
             last_ping_time = Instant::now();
@@ -229,7 +170,7 @@ async fn main() {
                             ),
                         );
                     } else {
-                        // If we don't have enough positions for interpolation, use the current position
+                        // Fallback to current position if no interpolation data
                         renderer.draw_player(
                             pos.x as f32,
                             pos.y as f32,
@@ -238,9 +179,21 @@ async fn main() {
                                 ((color >> 8) & 0xFF_u32) as u8,
                                 (color & 0xFF_u32) as u8,
                                 255,
-                            )
+                            ),
                         );
                     }
+                } else {
+                    // Fallback to current position if no interpolation data
+                    renderer.draw_player(
+                        pos.x as f32,
+                        pos.y as f32,
+                        Color::from_rgba(
+                            ((color >> 16) & 0xFF_u32) as u8,
+                            ((color >> 8) & 0xFF_u32) as u8,
+                            (color & 0xFF_u32) as u8,
+                            255,
+                        ),
+                    );
                 }
             } else {
                 // Draw local player with prediction error visualization
@@ -272,7 +225,6 @@ async fn main() {
                         255,
                     ),
                 );
-                
             }
         }
 
@@ -282,6 +234,7 @@ async fn main() {
         next_frame().await;
     }
 }
+
 fn start_next_test(
     performance_analyzer: &mut PerformanceAnalyzer,
     input_handler: &mut InputHandler,
