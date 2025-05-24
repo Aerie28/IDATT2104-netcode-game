@@ -1,18 +1,15 @@
 use crate::types::{ClientMessage, PlayerInput, GameState};
-use std::net::{SocketAddr, UdpSocket};
+use std::net::{ UdpSocket};
 use std::time::{Duration, Instant};
 use bincode;
 use rand::Rng;
 use rand::seq::SliceRandom;
 use crate::constants::{DELAY_MS, PACKET_LOSS};
 use std::collections::VecDeque;
-use uuid::Uuid;
-use crate::types::Position;
 
 pub struct NetworkClient {
     pub socket: UdpSocket,
     server_addr: String,
-    client_addr: Option<SocketAddr>,
     pub delay_ms: i32,
     pub packet_loss: i32,
     delayed_packets: VecDeque<(Vec<u8>, Instant, u32, i32)>, // (data, send_time, sequence, delay)
@@ -25,7 +22,6 @@ impl NetworkClient {
         Self {
             socket,
             server_addr: server_addr.to_string(),
-            client_addr: None,
             delay_ms: DELAY_MS,
             packet_loss: PACKET_LOSS,
             delayed_packets: VecDeque::new(),

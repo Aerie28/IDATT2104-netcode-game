@@ -102,7 +102,6 @@ async fn main() {
                         }
                         ClientMessage::PlayerId(_) => {
                             // Ignore PlayerId messages from clients
-                            println!("Received PlayerId message from client {}", addr);
                         }
                     }
                 }

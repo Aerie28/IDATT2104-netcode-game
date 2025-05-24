@@ -2,13 +2,7 @@
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use crate::constants::{TEST_DURATION};
-
-#[derive(Clone)]
-pub struct NetworkCondition {
-    pub latency_ms: i32,
-    pub packet_loss_percent: i32,
-    pub name: String,
-}
+use crate::types::NetworkCondition;
 
 pub struct PerformanceMetrics {
     pub avg_prediction_error: f32,
@@ -24,7 +18,6 @@ pub struct PerformanceAnalyzer {
     current_index: usize,
     samples: Vec<f32>,
     start_time: Instant,
-    sample_duration: Duration,
 }
 
 impl PerformanceAnalyzer {
@@ -43,7 +36,6 @@ impl PerformanceAnalyzer {
             current_index: 0,
             samples: Vec::new(),
             start_time: Instant::now(),
-            sample_duration,
         }
     }
 

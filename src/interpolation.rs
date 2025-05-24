@@ -1,13 +1,7 @@
 use std::collections::VecDeque;
-use crate::types::Position;
-use crate::constants::{INTERPOLATION_DELAY, MAX_POSITION_HISTORY, MAX_INTERPOLATION_TIME};
+use crate::types::{InterpolatedPosition, Position};
+use crate::constants::{INTERPOLATION_DELAY, MAX_POSITION_HISTORY};
 
-#[derive(Debug, Clone)]
-pub struct InterpolatedPosition {
-    pub position: Position,
-    pub timestamp: f32,
-    pub sequence: u32,
-}
 
 pub struct InterpolationState {
     position_history: VecDeque<InterpolatedPosition>,
@@ -86,22 +80,4 @@ impl InterpolationState {
         }
     }
 
-    pub fn update(&mut self, current_time: f32) {
-        // Remove positions that are too old
-        while let Some(oldest) = self.position_history.front() {
-            if current_time - oldest.timestamp > MAX_INTERPOLATION_TIME {
-                self.position_history.pop_front();
-            } else {
-                break;
-            }
-        }
-    }
-
-    pub fn set_interpolation_delay(&mut self, delay: f32) {
-        self.interpolation_delay = delay;
-    }
-
-    pub fn get_last_sequence(&self) -> u32 {
-        self.last_sequence
-    }
 } 
