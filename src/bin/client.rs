@@ -105,6 +105,11 @@ async fn main() {
                         // Calculate prediction error
                         let error = prediction.get_prediction_error(*pos);
                         prediction_errors.insert(*id, error);
+
+                        // Add this line to record errors during testing
+                        if is_testing {
+                            performance_analyzer.record_prediction_error(error);
+                        }
                         
                         // Reapply pending inputs after reconciliation
                         prediction.reapply_pending_inputs(&mut my_pos);
