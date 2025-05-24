@@ -1,5 +1,4 @@
 use macroquad::prelude::*;
-use miniquad::*;
 use uuid::Uuid;
 use std::collections::HashMap;
 use netcode_game::render::Renderer;
@@ -51,7 +50,6 @@ async fn main() {
             } else {
                 // Connect
                 println!("Starting connect process...");
-                let start = Instant::now();
                 net.send_connect();
                 should_send_pings = true;
                 is_connected = true;
@@ -74,9 +72,7 @@ async fn main() {
 
             // Receive and process game state from server
             if let Some(game_state) = net.try_receive_snapshot() {
-                let current_time = get_time();
-                let server_time = game_state.server_timestamp as f64 / 1000.0; // Convert from milliseconds to seconds
-                let time_diff = current_time - server_time;
+                let current_time = get_time(); // Convert from milliseconds to seconds
                 
                 // Create a set of current player IDs from the server
                 let current_player_ids: std::collections::HashSet<Uuid> = game_state.players.iter()

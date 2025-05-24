@@ -93,14 +93,6 @@ impl PredictionState {
         let dy = (server_position.y - self.last_confirmed_position.y) as f32;
         (dx * dx + dy * dy).sqrt()
     }
-
-    pub fn reset(&mut self) {
-        self.pending_inputs.clear();
-        self.last_reconciliation_time = 0.0;
-    }
-
-    pub fn reset_with_position(&mut self, position: Position) {
-        self.last_confirmed_position = position;
-        self.reset();
-    }
+    
+    
 } 

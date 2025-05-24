@@ -5,16 +5,11 @@ use std::{
     time::Instant,
 };
 use crate::colors::player_colors;
-use crate::types::{Position, PlayerInput, Direction, GameState};
+use crate::types::{Position, PlayerInput, Direction, GameState, PositionSnapshot};
 use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, PLAYER_SIZE, TOOL_BAR_HEIGHT};
 
 const MAX_POSITION_HISTORY: usize = 60; // Store 1 second of history at 60fps
 
-#[derive(Clone)]
-pub struct PositionSnapshot {
-    pub position: Position,
-    pub timestamp: u64,
-}
 
 /// Stores state for one player
 pub struct PlayerState {
