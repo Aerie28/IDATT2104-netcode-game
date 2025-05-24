@@ -128,3 +128,63 @@ impl NetworkClient {
         }
     }
 }
+
+/// Test module for NetworkClient
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_client() {
+        let client = NetworkClient::new("127.0.0.1:8080");
+        assert_eq!(client.server_addr, "127.0.0.1:8080");
+        assert_eq!(client.delay_ms, DELAY_MS);
+        assert_eq!(client.packet_loss, PACKET_LOSS);
+        assert!(client.delayed_packets.is_empty());
+    }
+
+    #[test]
+    fn test_simulate_network_conditions() {
+        let mut client = NetworkClient::new("127.0.0.1:8080");
+
+        // With 0% loss, should never drop packets
+        client.packet_loss = 0;
+        for _ in 0..100 {
+            assert!(!client.simulate_network_conditions());
+        }
+
+        // With 100% loss, should always drop packets
+        client.packet_loss = 100;
+        for _ in 0..100 {
+            assert!(client.simulate_network_conditions());
+        }
+    }
+
+    #[test]
+    fn test_send_connect() {
+        // This is mostly a compilation test since we can't easily
+        // check the actual message without a mock socket
+        let client = NetworkClient::new("127.0.0.1:8080");
+        client.send_connect(); // Should not panic
+    }
+
+    #[test]
+    fn test_send_ping() {
+        // Similar to above, just ensuring it compiles and runs
+        let client = NetworkClient::new("127.0.0.1:8080");
+        client.send_ping(12345); // Should not panic
+    }
+
+    #[test]
+    fn test_receive_data_with_packet_loss() {
+        let mut client = NetworkClient::new("127.0.0.1:8080");
+        client.packet_loss = 100; // Always drop packets
+
+        // Since it will always simulate packet loss, this should be None
+        let result: Option<GameState> = client.receive_data();
+        assert!(result.is_none());
+    }
+
+    // For complete socket testing, you'd need more complex setup with
+    // mocked UdpSocket, but that's outside the scope of basic unit tests
+}

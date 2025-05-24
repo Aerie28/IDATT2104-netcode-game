@@ -25,7 +25,7 @@ impl InputHandler {
             packet_loss: PACKET_LOSS,
         }
     }
-    
+
     /// Input keys for selector input
     pub fn handle_selector_input(&mut self) {
         if is_key_pressed(KeyCode::V) {
@@ -41,7 +41,7 @@ impl InputHandler {
             self.packet_loss = (self.packet_loss + 1).min(100);
         }
     }
-    
+
     /// Handles player input and applies prediction logic
     pub fn handle_input(
         &mut self,
@@ -125,5 +125,54 @@ impl InputHandler {
                 self.key_timers.remove(&key);
             }
         }
+    }
+}
+
+/// Test cases for InputHandler
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_input_handler() {
+        let handler = InputHandler::new();
+        assert!(handler.key_timers.is_empty());
+        assert!(handler.key_states.is_empty());
+        assert_eq!(handler.delay_ms, DELAY_MS);
+        assert_eq!(handler.packet_loss, PACKET_LOSS);
+    }
+
+    #[test]
+    fn test_manual_state_adjustment() {
+        let mut handler = InputHandler::new();
+
+        // Test delay adjustment
+        handler.delay_ms = 50;
+        handler.delay_ms = (handler.delay_ms - 10).max(0);
+        assert_eq!(handler.delay_ms, 40);
+
+        // Test packet loss adjustment
+        handler.packet_loss = 10;
+        handler.packet_loss = (handler.packet_loss + 1).min(100);
+        assert_eq!(handler.packet_loss, 11);
+    }
+
+    #[test]
+    fn test_key_state_tracking() {
+        let mut handler = InputHandler::new();
+
+        // Manually set key state
+        handler.key_states.insert(KeyCode::W, true);
+        handler.key_timers.insert(KeyCode::W, INITIAL_DELAY);
+
+        assert_eq!(handler.key_states.get(&KeyCode::W), Some(&true));
+        assert_eq!(handler.key_timers.get(&KeyCode::W), Some(&INITIAL_DELAY));
+
+        // Test key release state update
+        handler.key_states.insert(KeyCode::W, false);
+        handler.key_timers.remove(&KeyCode::W);
+
+        assert_eq!(handler.key_states.get(&KeyCode::W), Some(&false));
+        assert!(!handler.key_timers.contains_key(&KeyCode::W));
     }
 }

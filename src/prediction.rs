@@ -101,4 +101,199 @@ impl PredictionState {
         let dy = (server_position.y - self.last_confirmed_position.y) as f32;
         (dx * dx + dy * dy).sqrt()
     }
-} 
+}
+
+/// Tests for the PredictionState
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_prediction_state() {
+        let initial_position = Position { x: 100, y: 100 };
+        let state = PredictionState::new(initial_position);
+
+        assert_eq!(state.next_sequence, 0);
+        assert!(state.pending_inputs.is_empty());
+        assert!(state.position_history.is_empty());
+        assert_eq!(state.last_confirmed_sequence, 0);
+        assert_eq!(state.last_confirmed_position.x, initial_position.x);
+        assert_eq!(state.last_confirmed_position.y, initial_position.y);
+        assert_eq!(state.last_reconciliation_time, 0.0);
+    }
+
+    #[test]
+    fn test_apply_prediction_up() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+        let mut position = initial_position;
+
+        let input = PlayerInput {
+            dir: Direction::Up,
+            sequence: 0,
+            timestamp: 0,
+        };
+
+        state.apply_prediction(input, &mut position);
+
+        assert_eq!(position.x, initial_position.x);
+        assert_eq!(position.y, initial_position.y - PLAYER_SPEED);
+        assert_eq!(state.position_history.len(), 1);
+        assert_eq!(state.position_history[0].0, 0);  // sequence
+        assert_eq!(state.position_history[0].1.x, initial_position.x);  // original position
+        assert_eq!(state.position_history[0].1.y, initial_position.y);
+    }
+
+    #[test]
+    fn test_apply_prediction_down() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+        let mut position = initial_position;
+
+        let input = PlayerInput {
+            dir: Direction::Down,
+            sequence: 1,
+            timestamp: 0,
+        };
+
+        state.apply_prediction(input, &mut position);
+
+        assert_eq!(position.x, initial_position.x);
+        assert_eq!(position.y, initial_position.y + PLAYER_SPEED);
+        assert_eq!(state.position_history.len(), 1);
+        assert_eq!(state.position_history[0].0, 1);  // sequence
+    }
+
+    #[test]
+    fn test_apply_prediction_left() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+        let mut position = initial_position;
+
+        let input = PlayerInput {
+            dir: Direction::Left,
+            sequence: 2,
+            timestamp: 0,
+        };
+
+        state.apply_prediction(input, &mut position);
+
+        assert_eq!(position.x, initial_position.x - PLAYER_SPEED);
+        assert_eq!(position.y, initial_position.y);
+        assert_eq!(state.position_history.len(), 1);
+        assert_eq!(state.position_history[0].0, 2);  // sequence
+    }
+
+    #[test]
+    fn test_apply_prediction_right() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+        let mut position = initial_position;
+
+        let input = PlayerInput {
+            dir: Direction::Right,
+            sequence: 3,
+            timestamp: 0,
+        };
+
+        state.apply_prediction(input, &mut position);
+
+        assert_eq!(position.x, initial_position.x + PLAYER_SPEED);
+        assert_eq!(position.y, initial_position.y);
+        assert_eq!(state.position_history.len(), 1);
+        assert_eq!(state.position_history[0].0, 3);  // sequence
+    }
+
+    #[test]
+    fn test_prediction_boundary_limits() {
+        // Test hitting the left boundary
+        let mut state = PredictionState::new(Position { x: PLAYER_SIZE + 1, y: 100 });
+        let mut position = Position { x: PLAYER_SIZE + 1, y: 100 };
+
+        state.apply_prediction(PlayerInput { dir: Direction::Left, sequence: 1, timestamp: 0 }, &mut position);
+        assert_eq!(position.x, PLAYER_SIZE);  // Should stop at boundary
+
+        // Test hitting the right boundary
+        position = Position { x: BOARD_WIDTH - PLAYER_SIZE - 1, y: 100 };
+        state.apply_prediction(PlayerInput { dir: Direction::Right, sequence: 2, timestamp: 0 }, &mut position);
+        assert_eq!(position.x, BOARD_WIDTH - PLAYER_SIZE);  // Should stop at boundary
+
+        // Test hitting the top boundary
+        position = Position { x: 100, y: PLAYER_SIZE + 1 };
+        state.apply_prediction(PlayerInput { dir: Direction::Up, sequence: 3, timestamp: 0 }, &mut position);
+        assert_eq!(position.y, PLAYER_SIZE);  // Should stop at boundary
+
+        // Test hitting the bottom boundary
+        position = Position { x: 100, y: BOARD_HEIGHT - PLAYER_SIZE - TOOL_BAR_HEIGHT - 1 };
+        state.apply_prediction(PlayerInput { dir: Direction::Down, sequence: 4, timestamp: 0 }, &mut position);
+        assert_eq!(position.y, BOARD_HEIGHT - PLAYER_SIZE - TOOL_BAR_HEIGHT);  // Should stop at boundary
+    }
+
+    #[test]
+    fn test_reconcile_normal_case() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+
+        // Initialize last_reconciliation_time to avoid the time-based aggressive clean
+        state.last_reconciliation_time = 0.8; // So the difference will be 0.2, below threshold
+
+        // Add some pending inputs
+        state.pending_inputs.push_back((1, PlayerInput { dir: Direction::Up, sequence: 1, timestamp: 0 }));
+        state.pending_inputs.push_back((2, PlayerInput { dir: Direction::Left, sequence: 2, timestamp: 0 }));
+        state.pending_inputs.push_back((3, PlayerInput { dir: Direction::Right, sequence: 3, timestamp: 0 }));
+
+        // Add position history
+        state.position_history.push_back((1, Position { x: 100, y: 100 }));
+        state.position_history.push_back((2, Position { x: 100, y: 90 }));
+        state.position_history.push_back((3, Position { x: 90, y: 90 }));
+
+        // Server confirms up to sequence 2
+        let server_position = Position { x: 95, y: 85 };  // Slightly different from client's prediction
+        state.reconcile(server_position, 2, 1.0);
+
+        // Check state after reconciliation
+        assert_eq!(state.last_confirmed_sequence, 2);
+        assert_eq!(state.last_confirmed_position.x, 95);
+        assert_eq!(state.last_confirmed_position.y, 85);
+        assert_eq!(state.pending_inputs.len(), 1);  // Only sequence 3 should remain
+        assert_eq!(state.pending_inputs[0].0, 3);
+        assert_eq!(state.position_history.len(), 1);  // Only sequence 3 position should remain
+        assert_eq!(state.position_history[0].0, 3);
+    }
+
+    #[test]
+    fn test_reapply_pending_inputs() {
+        let initial_position = Position { x: 100, y: 100 };
+        let mut state = PredictionState::new(initial_position);
+        let mut current_position = Position { x: 200, y: 200 };  // Intentionally different
+
+        // Add pending inputs: right, right, down
+        state.pending_inputs.push_back((1, PlayerInput { dir: Direction::Right, sequence: 1, timestamp: 0 }));
+        state.pending_inputs.push_back((2, PlayerInput { dir: Direction::Right, sequence: 2, timestamp: 0 }));
+        state.pending_inputs.push_back((3, PlayerInput { dir: Direction::Down, sequence: 3, timestamp: 0 }));
+
+        // Reapply all inputs
+        state.reapply_pending_inputs(&mut current_position);
+
+        // Should start from last_confirmed_position (100, 100)
+        // Then apply: right (+PLAYER_SPEED, 0), right (+PLAYER_SPEED, 0), down (0, +PLAYER_SPEED)
+        let expected_x = initial_position.x + 2 * PLAYER_SPEED;
+        let expected_y = initial_position.y + PLAYER_SPEED;
+
+        assert_eq!(current_position.x, expected_x);
+        assert_eq!(current_position.y, expected_y);
+    }
+
+    #[test]
+    fn test_prediction_error_calculation() {
+        let initial_position = Position { x: 100, y: 100 };
+        let state = PredictionState::new(initial_position);
+
+        // Test with position offset by 3 horizontally and 4 vertically (5 units total distance)
+        let server_position = Position { x: 103, y: 104 };
+        let error = state.get_prediction_error(server_position);
+
+        // Error should be sqrt(3^2 + 4^2) = 5.0
+        assert_eq!(error, 5.0);
+    }
+}

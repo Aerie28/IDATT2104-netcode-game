@@ -29,3 +29,24 @@ pub fn config_window() -> Conf {
         ..Default::default()
     }
 }
+
+/// Unit test to ensure the configuration is correct
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_config_window() {
+        // Verify the function doesn't panic
+        let conf = config_window();
+
+        // Verify configuration values match constants
+        assert_eq!(conf.window_title, WINDOW_TITLE);
+        assert_eq!(conf.window_width, WINDOW_WIDTH);
+        assert_eq!(conf.window_height, WINDOW_HEIGHT);
+        assert_eq!(conf.window_resizable, WINDOW_RESIZABLE);
+
+        // Verify icon was created
+        assert!(conf.icon.is_some());
+    }
+}

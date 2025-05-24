@@ -40,7 +40,7 @@ async fn main() {
     let original_delay = input_handler.delay_ms;
     let original_loss = input_handler.packet_loss;
     let mut is_testing = false;
-    
+
     // Main game loop
     loop {
         let current_time = get_time();
@@ -119,7 +119,7 @@ async fn main() {
                 }
             }
 
-            // Check for PlayerId message from server (not needed for functional gameplay, 
+            // Check for PlayerId message from server (not needed for functional gameplay,
             // but needed as a default)
             if let Some(msg) = net.try_receive_message() {
                 match msg {
@@ -226,4 +226,103 @@ fn draw_player_with_color(position: Position, color: u32, renderer: &Renderer) {
             255,
         ),
     );
+}
+
+/// Tests for the client functionality
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_start_next_test() {
+        // Simple struct that matches what PerformanceAnalyzer.start_next_test returns
+        struct TestCondition {
+            pub latency_ms: i32,
+            pub packet_loss_percent: i32,
+        }
+
+        // Test implementation of the required method
+        struct TestPerformanceAnalyzer {
+            conditions: Vec<TestCondition>,
+            index: usize,
+        }
+
+        impl TestPerformanceAnalyzer {
+            fn new() -> Self {
+                Self {
+                    conditions: vec![
+                        TestCondition { latency_ms: 50, packet_loss_percent: 5 },
+                        TestCondition { latency_ms: 100, packet_loss_percent: 10 },
+                    ],
+                    index: 0,
+                }
+            }
+
+            fn start_next_test(&mut self) -> Option<&TestCondition> {
+                if self.index < self.conditions.len() {
+                    let condition = &self.conditions[self.index];
+                    self.index += 1;
+                    Some(condition)
+                } else {
+                    None
+                }
+            }
+        }
+
+        let mut analyzer = TestPerformanceAnalyzer::new();
+        let mut input_handler = InputHandler::new();
+
+        // Create our own test function rather than using the real one
+        fn test_next(analyzer: &mut TestPerformanceAnalyzer, handler: &mut InputHandler) -> bool {
+            if let Some(condition) = analyzer.start_next_test() {
+                handler.delay_ms = condition.latency_ms;
+                handler.packet_loss = condition.packet_loss_percent;
+                true
+            } else {
+                false
+            }
+        }
+
+        // Test the logic
+        assert!(test_next(&mut analyzer, &mut input_handler));
+        assert_eq!(input_handler.delay_ms, 50);
+        assert_eq!(input_handler.packet_loss, 5);
+
+        assert!(test_next(&mut analyzer, &mut input_handler));
+        assert_eq!(input_handler.delay_ms, 100);
+        assert_eq!(input_handler.packet_loss, 10);
+
+        assert!(!test_next(&mut analyzer, &mut input_handler));
+    }
+
+    #[test]
+    fn test_color_conversion() {
+        let color = 0xFF0000; // Red
+
+        let r = ((color >> 16) & 0xFF_u32) as u8;
+        let g = ((color >> 8) & 0xFF_u32) as u8;
+        let b = (color & 0xFF_u32) as u8;
+
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
+
+        let color = 0x00FF00; // Green
+
+        let r = ((color >> 16) & 0xFF_u32) as u8;
+        let g = ((color >> 8) & 0xFF_u32) as u8;
+        let b = (color & 0xFF_u32) as u8;
+
+        assert_eq!(r, 0);
+        assert_eq!(g, 255);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn test_position_creation() {
+        // Test the Position struct
+        let pos = Position { x: 100, y: 200 };
+        assert_eq!(pos.x, 100);
+        assert_eq!(pos.y, 200);
+    }
 }

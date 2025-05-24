@@ -39,3 +39,21 @@ pub mod player_colors {
         ]
     }
 }
+
+/// Tests for the color module
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_player_color_palette() {
+        // Test that the palette returns the correct number of colors
+        let palette = player_colors::get_palette();
+        assert_eq!(palette.len(), 9);
+
+        // Test that the colors in the palette match the constants
+        assert_eq!(palette[0], player_colors::RED);
+        assert_eq!(palette[1], player_colors::GREEN);
+        assert_eq!(palette[8], player_colors::PINK);
+    }
+}

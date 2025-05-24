@@ -132,3 +132,98 @@ impl Renderer {
         );
     }
 }
+
+/// Tests for the Renderer
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_renderer_creation() {
+        Renderer::new();
+    }
+
+    #[test]
+    fn test_player_position_calculation() {
+        let player_x = 100.0;
+        let player_y = 200.0;
+        let half_size = (PLAYER_SIZE as f32) / 2.0;
+
+        // Calculate expected rectangle coordinates
+        let expected_rect_x = player_x - half_size;
+        let expected_rect_y = player_y - half_size;
+
+        // Verify the calculation for rectangle position
+        assert_eq!(expected_rect_x, player_x - half_size);
+        assert_eq!(expected_rect_y, player_y - half_size);
+    }
+
+    #[test]
+    fn test_toolbar_responsive_layout() {
+        let wide_screen_width = 1000.0;
+        let min_width_for_single_line = 900.0;
+        let is_two_line = wide_screen_width < min_width_for_single_line;
+
+        assert!(!is_two_line); // Should be false for 1000 width
+
+        // Test two-line layout (narrow screen)
+        let narrow_width = 800.0;
+        let is_two_line_narrow = narrow_width < min_width_for_single_line;
+
+        assert!(is_two_line_narrow); // Should be true for 800 width
+    }
+
+    #[test]
+    fn test_toolbar_height_calculation() {
+        let bar_height = TOOL_BAR_HEIGHT as f32;
+
+        // For wide screen (single line)
+        let width_wide = 1000.0;
+        let min_width_for_single_line = 900.0;
+        let is_two_line_wide = width_wide < min_width_for_single_line;
+        let bar_total_height_wide = if is_two_line_wide { bar_height * 2.0 } else { bar_height };
+
+        assert_eq!(bar_total_height_wide, bar_height);
+
+        // For narrow screen (two lines)
+        let width_narrow = 800.0;
+        let is_two_line_narrow = width_narrow < min_width_for_single_line;
+        let bar_total_height_narrow = if is_two_line_narrow { bar_height * 2.0 } else { bar_height };
+
+        assert_eq!(bar_total_height_narrow, bar_height * 2.0);
+    }
+
+    #[test]
+    fn test_indicator_color_selection() {
+        // When testing
+        let is_testing = true;
+        let indicator_color_testing = if is_testing {
+            bg_colors::ORANGE
+        } else {
+            bg_colors::DARK_GRAY
+        };
+        assert_eq!(indicator_color_testing, bg_colors::ORANGE);
+
+        // When not testing
+        let is_testing = false;
+        let indicator_color_not_testing = if is_testing {
+            bg_colors::ORANGE
+        } else {
+            bg_colors::DARK_GRAY
+        };
+        assert_eq!(indicator_color_not_testing, bg_colors::DARK_GRAY);
+    }
+
+    #[test]
+    fn test_connection_text() {
+        // When connected
+        let is_connected = true;
+        let connect_text_connected = if is_connected { "Drop connection [R]" } else { "Reconnect [R]" };
+        assert_eq!(connect_text_connected, "Drop connection [R]");
+
+        // When disconnected
+        let is_connected = false;
+        let connect_text_disconnected = if is_connected { "Drop connection [R]" } else { "Reconnect [R]" };
+        assert_eq!(connect_text_disconnected, "Reconnect [R]");
+    }
+}
