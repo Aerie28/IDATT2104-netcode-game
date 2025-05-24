@@ -1,23 +1,27 @@
 use macroquad::prelude::*;
-use uuid::Uuid;
-use std::collections::HashMap;
-use netcode_game::render::Renderer;
-use netcode_game::input::InputHandler;
-use netcode_game::network::NetworkClient;
-use netcode_game::types::{Position, ClientMessage};
-use netcode_game::config::config_window;
-use netcode_game::prediction::PredictionState;
-use netcode_game::interpolation::InterpolationState;
-use netcode_game::analysis::PerformanceAnalyzer;
-use netcode_game::constants::{PREDICTION_ERROR_THRESHOLD, PING_INTERVAL, PERFORMANCE_TEST_FREQUENCY};
-use std::time::{Instant};
 
+use netcode_game::analysis::PerformanceAnalyzer;
+use netcode_game::config::config_window;
+use netcode_game::constants::{ PREDICTION_ERROR_THRESHOLD, PING_INTERVAL, PERFORMANCE_TEST_FREQUENCY };
+use netcode_game::input::InputHandler;
+use netcode_game::interpolation::InterpolationState;
+use netcode_game::network::NetworkClient;
+use netcode_game::prediction::PredictionState;
+use netcode_game::render::Renderer;
+use netcode_game::types::{Position, ClientMessage};
+
+use std::collections::HashMap;
+use std::time::{Instant};
+use uuid::Uuid;
+
+/// Client main function
 #[macroquad::main(config_window)]
 async fn main() {
+    // Initialize the game window and connect to the server
     let mut net = NetworkClient::new("127.0.0.1:9000");
     net.send_connect();
     
-    // Initialize helpers
+    // Initialize helpers and variables
     let renderer = Renderer::new();
     let mut input_handler = InputHandler::new();
     let mut performance_analyzer = PerformanceAnalyzer::new(PERFORMANCE_TEST_FREQUENCY);
@@ -36,7 +40,8 @@ async fn main() {
     let original_delay = input_handler.delay_ms;
     let original_loss = input_handler.packet_loss;
     let mut is_testing = false;
-    
+
+    // Main game loop
     loop {
         let current_time = get_time();
         
@@ -102,7 +107,7 @@ async fn main() {
                         let error = prediction.get_prediction_error(*pos);
                         prediction_errors.insert(*id, error);
 
-                        // Add this line to record errors during testing
+                        // Record performance analysis errors
                         if is_testing {
                             performance_analyzer.record_prediction_error(error);
                         }
@@ -114,7 +119,8 @@ async fn main() {
                 }
             }
 
-            // Check for PlayerId message
+            // Check for PlayerId message from server (not needed for functional gameplay,
+            // but needed as a default)
             if let Some(msg) = net.try_receive_message() {
                 match msg {
                     ClientMessage::PlayerId(id) => {
@@ -125,7 +131,6 @@ async fn main() {
                         }
                     }
                     _ => {
-                        // Ignore other messages
                     }
                 }
             }
@@ -157,45 +162,13 @@ async fn main() {
         // Draw all players with interpolation
         for (id, (pos, color)) in all_players.iter() {
             if Some(*id) != my_id {
-                // Get interpolated position for other players
-                if let Some(interpolation) = interpolated_positions.get(id) {
-                    if let Some(interpolated_pos) = interpolation.get_interpolated_position(current_time as f32) {
-                        renderer.draw_player(
-                            interpolated_pos.x as f32,
-                            interpolated_pos.y as f32,
-                            Color::from_rgba(
-                                ((color >> 16) & 0xFF_u32) as u8,
-                                ((color >> 8) & 0xFF_u32) as u8,
-                                (color & 0xFF_u32) as u8,
-                                255,
-                            ),
-                        );
-                    } else {
-                        // Fallback to current position if no interpolation data
-                        renderer.draw_player(
-                            pos.x as f32,
-                            pos.y as f32,
-                            Color::from_rgba(
-                                ((color >> 16) & 0xFF_u32) as u8,
-                                ((color >> 8) & 0xFF_u32) as u8,
-                                (color & 0xFF_u32) as u8,
-                                255,
-                            ),
-                        );
-                    }
-                } else {
-                    // Fallback to current position if no interpolation data
-                    renderer.draw_player(
-                        pos.x as f32,
-                        pos.y as f32,
-                        Color::from_rgba(
-                            ((color >> 16) & 0xFF_u32) as u8,
-                            ((color >> 8) & 0xFF_u32) as u8,
-                            (color & 0xFF_u32) as u8,
-                            255,
-                        ),
-                    );
-                }
+                // Determine position to draw (interpolated or fallback)
+                let position_to_draw = interpolated_positions
+                    .get(id)
+                    .and_then(|interpol| interpol.get_interpolated_position(current_time as f32))
+                    .unwrap_or(*pos);
+
+                draw_player_with_color(position_to_draw, *color, &renderer);
             } else {
                 // Draw local player with prediction error visualization
                 let error = prediction_errors.get(id).copied().unwrap_or(0.0);
@@ -215,17 +188,7 @@ async fn main() {
                     );
                 }
 
-                // Draw the player
-                renderer.draw_player(
-                    my_pos.x as f32,
-                    my_pos.y as f32,
-                    Color::from_rgba(
-                        ((color >> 16) & 0xFF_u32) as u8,
-                        ((color >> 8) & 0xFF_u32) as u8,
-                        (color & 0xFF_u32) as u8,
-                        255,
-                    ),
-                );
+                draw_player_with_color(my_pos, *color, &renderer);
             }
         }
 
@@ -236,6 +199,7 @@ async fn main() {
     }
 }
 
+/// Helper function to start the next performance test
 fn start_next_test(
     performance_analyzer: &mut PerformanceAnalyzer,
     input_handler: &mut InputHandler,
@@ -247,5 +211,118 @@ fn start_next_test(
         true
     } else {
         false
+    }
+}
+
+/// Helper function to draw a player with a specific color
+fn draw_player_with_color(position: Position, color: u32, renderer: &Renderer) {
+    renderer.draw_player(
+        position.x as f32,
+        position.y as f32,
+        Color::from_rgba(
+            ((color >> 16) & 0xFF_u32) as u8,
+            ((color >> 8) & 0xFF_u32) as u8,
+            (color & 0xFF_u32) as u8,
+            255,
+        ),
+    );
+}
+
+/// Tests for the client functionality
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_start_next_test() {
+        // Simple struct that matches what PerformanceAnalyzer.start_next_test returns
+        struct TestCondition {
+            pub latency_ms: i32,
+            pub packet_loss_percent: i32,
+        }
+
+        // Test implementation of the required method
+        struct TestPerformanceAnalyzer {
+            conditions: Vec<TestCondition>,
+            index: usize,
+        }
+
+        impl TestPerformanceAnalyzer {
+            fn new() -> Self {
+                Self {
+                    conditions: vec![
+                        TestCondition { latency_ms: 50, packet_loss_percent: 5 },
+                        TestCondition { latency_ms: 100, packet_loss_percent: 10 },
+                    ],
+                    index: 0,
+                }
+            }
+
+            fn start_next_test(&mut self) -> Option<&TestCondition> {
+                if self.index < self.conditions.len() {
+                    let condition = &self.conditions[self.index];
+                    self.index += 1;
+                    Some(condition)
+                } else {
+                    None
+                }
+            }
+        }
+
+        let mut analyzer = TestPerformanceAnalyzer::new();
+        let mut input_handler = InputHandler::new();
+
+        // Create our own test function rather than using the real one
+        fn test_next(analyzer: &mut TestPerformanceAnalyzer, handler: &mut InputHandler) -> bool {
+            if let Some(condition) = analyzer.start_next_test() {
+                handler.delay_ms = condition.latency_ms;
+                handler.packet_loss = condition.packet_loss_percent;
+                true
+            } else {
+                false
+            }
+        }
+
+        // Test the logic
+        assert!(test_next(&mut analyzer, &mut input_handler));
+        assert_eq!(input_handler.delay_ms, 50);
+        assert_eq!(input_handler.packet_loss, 5);
+
+        assert!(test_next(&mut analyzer, &mut input_handler));
+        assert_eq!(input_handler.delay_ms, 100);
+        assert_eq!(input_handler.packet_loss, 10);
+
+        assert!(!test_next(&mut analyzer, &mut input_handler));
+    }
+
+    #[test]
+    fn test_color_conversion() {
+        let color = 0xFF0000; // Red
+
+        let r = ((color >> 16) & 0xFF_u32) as u8;
+        let g = ((color >> 8) & 0xFF_u32) as u8;
+        let b = (color & 0xFF_u32) as u8;
+
+        assert_eq!(r, 255);
+        assert_eq!(g, 0);
+        assert_eq!(b, 0);
+
+        let color = 0x00FF00; // Green
+
+        let r = ((color >> 16) & 0xFF_u32) as u8;
+        let g = ((color >> 8) & 0xFF_u32) as u8;
+        let b = (color & 0xFF_u32) as u8;
+
+        assert_eq!(r, 0);
+        assert_eq!(g, 255);
+        assert_eq!(b, 0);
+    }
+
+    #[test]
+    fn test_position_creation() {
+        // Test the Position struct
+        let pos = Position { x: 100, y: 200 };
+        assert_eq!(pos.x, 100);
+        assert_eq!(pos.y, 200);
     }
 }

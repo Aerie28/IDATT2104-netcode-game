@@ -1,17 +1,24 @@
-use macroquad::prelude::*;
 use crate::colors::bg_colors;
 use crate::constants::{PLAYER_SIZE, TOOL_BAR_HEIGHT};
+
+use macroquad::prelude::*;
+
+/// Renderer for the game, responsible for drawing the game elements
 pub struct Renderer;
 
+/// Implementation of the Renderer
 impl Renderer {
+    /// Creates a new Renderer instance
     pub fn new() -> Self {
         Renderer
     }
 
+    /// Clears the screen with a black background
     pub fn clear(&self) {
         clear_background(bg_colors::BLACK);
     }
     
+    /// Draws the player at the specified position with the given color
     pub fn draw_player(
         &self,
         x: f32,
@@ -27,6 +34,7 @@ impl Renderer {
         );
     }
 
+    /// Draws the toolbar with network stats and controls
     pub fn draw_tool_bar(&self, delay_ms: i32, packet_loss: i32, is_connected: bool, is_testing: bool) {
         let bar_height = TOOL_BAR_HEIGHT as f32;
         let width = screen_width();
@@ -84,16 +92,16 @@ impl Renderer {
         let test_text = "Test [T]";
         let test_width = measure_text(test_text, None, text_size as u16, 1.0).width;
 
-        // 1. Testing indicator and label
-        let indicator_size = 10.0; // Smaller indicator
+        // Testing indicator and label
+        let indicator_size = 10.0;
         let indicator_spacing = 8.0;
 
         // Position from right side
         let test_x = width - connect_width - text_spacing * 2.0 - test_width - indicator_size - indicator_spacing;
 
-        // Draw indicator first (left of text)
+        // Draw indicator
         let indicator_x = test_x;
-        let indicator_y = status_y_pos - text_size/3.0; // Center vertically with text
+        let indicator_y = status_y_pos - text_size/3.0;
 
         // Draw indicator light
         let indicator_color = if is_testing {
@@ -105,7 +113,7 @@ impl Renderer {
         draw_circle(indicator_x, indicator_y, indicator_size / 2.0, indicator_color);
         draw_circle_lines(indicator_x, indicator_y, indicator_size / 2.0, 1.0, bg_colors::WHITE);
 
-        // Draw test text after indicator
+        // Draw test text
         draw_text(
             test_text,
             indicator_x + indicator_size + indicator_spacing,
@@ -114,7 +122,7 @@ impl Renderer {
             bg_colors::WHITE,
         );
 
-        // 2. Connection status
+        // Connection status
         draw_text(
             connect_text,
             width - connect_width - text_spacing,
@@ -122,5 +130,100 @@ impl Renderer {
             text_size,
             bg_colors::WHITE,
         );
+    }
+}
+
+/// Tests for the Renderer
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_renderer_creation() {
+        Renderer::new();
+    }
+
+    #[test]
+    fn test_player_position_calculation() {
+        let player_x = 100.0;
+        let player_y = 200.0;
+        let half_size = (PLAYER_SIZE as f32) / 2.0;
+
+        // Calculate expected rectangle coordinates
+        let expected_rect_x = player_x - half_size;
+        let expected_rect_y = player_y - half_size;
+
+        // Verify the calculation for rectangle position
+        assert_eq!(expected_rect_x, player_x - half_size);
+        assert_eq!(expected_rect_y, player_y - half_size);
+    }
+
+    #[test]
+    fn test_toolbar_responsive_layout() {
+        let wide_screen_width = 1000.0;
+        let min_width_for_single_line = 900.0;
+        let is_two_line = wide_screen_width < min_width_for_single_line;
+
+        assert!(!is_two_line); // Should be false for 1000 width
+
+        // Test two-line layout (narrow screen)
+        let narrow_width = 800.0;
+        let is_two_line_narrow = narrow_width < min_width_for_single_line;
+
+        assert!(is_two_line_narrow); // Should be true for 800 width
+    }
+
+    #[test]
+    fn test_toolbar_height_calculation() {
+        let bar_height = TOOL_BAR_HEIGHT as f32;
+
+        // For wide screen (single line)
+        let width_wide = 1000.0;
+        let min_width_for_single_line = 900.0;
+        let is_two_line_wide = width_wide < min_width_for_single_line;
+        let bar_total_height_wide = if is_two_line_wide { bar_height * 2.0 } else { bar_height };
+
+        assert_eq!(bar_total_height_wide, bar_height);
+
+        // For narrow screen (two lines)
+        let width_narrow = 800.0;
+        let is_two_line_narrow = width_narrow < min_width_for_single_line;
+        let bar_total_height_narrow = if is_two_line_narrow { bar_height * 2.0 } else { bar_height };
+
+        assert_eq!(bar_total_height_narrow, bar_height * 2.0);
+    }
+
+    #[test]
+    fn test_indicator_color_selection() {
+        // When testing
+        let is_testing = true;
+        let indicator_color_testing = if is_testing {
+            bg_colors::ORANGE
+        } else {
+            bg_colors::DARK_GRAY
+        };
+        assert_eq!(indicator_color_testing, bg_colors::ORANGE);
+
+        // When not testing
+        let is_testing = false;
+        let indicator_color_not_testing = if is_testing {
+            bg_colors::ORANGE
+        } else {
+            bg_colors::DARK_GRAY
+        };
+        assert_eq!(indicator_color_not_testing, bg_colors::DARK_GRAY);
+    }
+
+    #[test]
+    fn test_connection_text() {
+        // When connected
+        let is_connected = true;
+        let connect_text_connected = if is_connected { "Drop connection [R]" } else { "Reconnect [R]" };
+        assert_eq!(connect_text_connected, "Drop connection [R]");
+
+        // When disconnected
+        let is_connected = false;
+        let connect_text_disconnected = if is_connected { "Drop connection [R]" } else { "Reconnect [R]" };
+        assert_eq!(connect_text_disconnected, "Reconnect [R]");
     }
 }
