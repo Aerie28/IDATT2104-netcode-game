@@ -6,7 +6,7 @@ use std::{
 };
 use crate::colors::player_colors;
 use crate::types::{Position, PlayerInput, Direction, GameState};
-use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, ID_GRACE_PERIOD};
+use crate::constants::{BOARD_WIDTH, BOARD_HEIGHT, PLAYER_SPEED, TIMEOUT, ID_GRACE_PERIOD, PLAYER_SIZE, TOOL_BAR_HEIGHT};
 
 const MAX_POSITION_HISTORY: usize = 60; // Store 1 second of history at 60fps
 
@@ -61,8 +61,8 @@ impl Game {
         }
 
         let mut rng = rand::rng();
-        let x = rng.random_range(0..(BOARD_WIDTH as i32));
-        let y = rng.random_range(0..(BOARD_HEIGHT as i32));
+        let x = rng.random_range((PLAYER_SIZE)..(BOARD_WIDTH - (PLAYER_SIZE)));
+        let y = rng.random_range((PLAYER_SIZE)..(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT));
         
         // Pick a color from the palette randomly
         let palette = player_colors::get_palette();
@@ -107,10 +107,10 @@ impl Game {
             }
 
             match input.dir {
-                Direction::Up => player.position.y = player.position.y.saturating_sub(PLAYER_SPEED),
-                Direction::Down => player.position.y = player.position.y.saturating_add(PLAYER_SPEED),
-                Direction::Left => player.position.x = player.position.x.saturating_sub(PLAYER_SPEED),
-                Direction::Right => player.position.x = player.position.x.saturating_add(PLAYER_SPEED),
+                Direction::Up => player.position.y = (player.position.y.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
+                Direction::Down => player.position.y = (player.position.y.saturating_add(PLAYER_SPEED)).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
+                Direction::Left => player.position.x = (player.position.x.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
+                Direction::Right => player.position.x = (player.position.x.saturating_add(PLAYER_SPEED)).min(BOARD_WIDTH - (PLAYER_SIZE)),
             }
 
             // Store current position in history

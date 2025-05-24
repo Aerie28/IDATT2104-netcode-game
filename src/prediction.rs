@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 use crate::types::{Position, PlayerInput, Direction};
-use crate::constants::PLAYER_SPEED;
+use crate::constants::{BOARD_HEIGHT, BOARD_WIDTH, PLAYER_SIZE, PLAYER_SPEED, TOOL_BAR_HEIGHT};
 
 pub struct PredictionState {
     pub next_sequence: u32,
@@ -29,10 +29,10 @@ impl PredictionState {
         
         // Apply the movement prediction
         match input.dir {
-            Direction::Up => current_position.y = current_position.y.saturating_sub(PLAYER_SPEED),
-            Direction::Down => current_position.y = current_position.y.saturating_add(PLAYER_SPEED),
-            Direction::Left => current_position.x = current_position.x.saturating_sub(PLAYER_SPEED),
-            Direction::Right => current_position.x = current_position.x.saturating_add(PLAYER_SPEED),
+            Direction::Up => current_position.y = (current_position.y.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
+            Direction::Down => current_position.y = (current_position.y.saturating_add(PLAYER_SPEED)).min(BOARD_HEIGHT - (PLAYER_SIZE) - TOOL_BAR_HEIGHT),
+            Direction::Left => current_position.x = (current_position.x.saturating_sub(PLAYER_SPEED)).max(PLAYER_SIZE),
+            Direction::Right => current_position.x = (current_position.x.saturating_add(PLAYER_SPEED)).min(BOARD_WIDTH - (PLAYER_SIZE)),
         }
     }
 

@@ -8,10 +8,10 @@ pub const INTERPOLATION_DELAY: f32 = 0.016;
 
 /// Constants for window size
 pub const WINDOW_TITLE: &str = "Netcode Game";
-pub const HIGH_DPI: bool = true;
 pub const WINDOW_RESIZABLE: bool = false;
 pub const WINDOW_WIDTH: i32 = 1024;
 pub const WINDOW_HEIGHT: i32 = 768;
+pub const TOOL_BAR_HEIGHT: i32 = 40;
 
 /// Constants for the board
 pub const BOARD_WIDTH: i32 = 1024;

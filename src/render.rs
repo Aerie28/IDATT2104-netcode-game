@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 use crate::colors::bg_colors;
-use crate::constants::{BOARD_WIDTH, PLAYER_SIZE};
+use crate::constants::{PLAYER_SIZE, TOOL_BAR_HEIGHT};
 pub struct Renderer;
 
 impl Renderer {
@@ -28,7 +28,7 @@ impl Renderer {
     }
 
     pub fn draw_tool_bar(&self, delay_ms: i32, packet_loss: i32, is_connected: bool, is_testing: bool) {
-        let bar_height = 40.0;
+        let bar_height = TOOL_BAR_HEIGHT as f32;
         let width = screen_width();
         let height = screen_height();
         let text_size = 20.0;
