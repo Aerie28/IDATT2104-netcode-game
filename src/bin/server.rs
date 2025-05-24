@@ -97,10 +97,25 @@ async fn main() {
                             println!("Player {} connected from {}", id, addr);
                         }
                         ClientMessage::Reconnect(previous_id, position) => {
+                            println!("Received reconnect message from {} for ID {}", addr, previous_id);
+                            let start = Instant::now();
+                            
+                            // First check if the player is still active (race condition check)
+                            if let Some(active_addr) = game.get_id_to_addr().get(&previous_id) {
+                                if *active_addr == addr {
+                                    // Player is still active, no need to reconnect
+                                    println!("Player {} is still active, ignoring reconnect attempt", previous_id);
+                                    continue;
+                                }
+                            }
+
                             // Check if the ID exists in disconnected_players (within grace period)
                             if let Some(disconnected) = game.get_disconnected_player(&previous_id) {
+                                let disconnect_duration = Instant::now().duration_since(disconnected.disconnected_at);
+                                println!("Found disconnected player {} after {:?}", previous_id, disconnect_duration);
+                                
                                 // Check if the grace period has expired
-                                if Instant::now().duration_since(disconnected.disconnected_at) < ID_GRACE_PERIOD {
+                                if disconnect_duration < ID_GRACE_PERIOD {
                                     // ID exists and grace period not expired, allow reconnection
                                     game.reconnect_player(addr, previous_id, position);
                                     
@@ -114,7 +129,7 @@ async fn main() {
                                     let state_payload = bincode::serialize(&game_state).unwrap();
                                     let _ = socket.send_to(&state_payload, addr).await;
                                     
-                                    println!("Player {} reconnected from {}", previous_id, addr);
+                                    println!("Player {} reconnected from {} (took {:?})", previous_id, addr, start.elapsed());
                                 } else {
                                     // Grace period expired, remove from disconnected_players and treat as new connection
                                     game.cleanup_disconnected_with_time(Instant::now());
@@ -122,7 +137,7 @@ async fn main() {
                                     let id_msg = ClientMessage::PlayerId(id);
                                     let id_payload = bincode::serialize(&id_msg).unwrap();
                                     let _ = socket.send_to(&id_payload, addr).await;
-                                    println!("Grace period expired for ID {}, assigned new ID {} to {}", previous_id, id, addr);
+                                    println!("Grace period expired for ID {}, assigned new ID {} to {} (took {:?})", previous_id, id, addr, start.elapsed());
                                 }
                             } else {
                                 // ID not found in disconnected_players, treat as new connection
@@ -130,7 +145,7 @@ async fn main() {
                                 let id_msg = ClientMessage::PlayerId(id);
                                 let id_payload = bincode::serialize(&id_msg).unwrap();
                                 let _ = socket.send_to(&id_payload, addr).await;
-                                println!("Previous ID {} not found in disconnected players, assigned new ID {} to {}", previous_id, id, addr);
+                                println!("Previous ID {} not found in disconnected players, assigned new ID {} to {} (took {:?})", previous_id, id, addr, start.elapsed());
                             }
                         }
                         ClientMessage::Input(input) => {
@@ -138,7 +153,16 @@ async fn main() {
                             game.update_server_dropped();
                         }
                         ClientMessage::Disconnect => {
+                            println!("Received disconnect message from {}", addr);
+                            let start = Instant::now();
                             game.disconnect_player(&addr);
+                            println!("Disconnect processing took {:?}", start.elapsed());
+                            
+                            // Send acknowledgment to ensure client knows disconnect was processed
+                            let ack_msg = ClientMessage::Pong(0); // Using Pong as an ack
+                            let ack_payload = bincode::serialize(&ack_msg).unwrap();
+                            let _ = socket.send_to(&ack_payload, addr).await;
+                            println!("Sent disconnect acknowledgment to {}", addr);
                         }
                         ClientMessage::Ping(timestamp) => {
                             // Echo back the timestamp as a pong

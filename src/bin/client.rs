@@ -58,34 +58,62 @@ async fn main() {
             if is_connected {
                 // Disconnect
                 if my_id.is_some() {
+                    println!("Starting disconnect process...");
+                    let start = Instant::now();
+                    
                     // Store current state before disconnecting
                     previous_id = my_id;
                     previous_position = Some(my_pos);
                     
-                    // Send disconnect message and wait a bit to ensure it's received
+                    // Send disconnect message and wait for acknowledgment
+                    println!("Sending disconnect message...");
                     net.send_disconnect();
-                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    
+                    // Wait for acknowledgment (Pong message)
+                    let mut ack_received = false;
+                    let start_wait = Instant::now();
+                    println!("Waiting for disconnect acknowledgment...");
+                    while !ack_received && start_wait.elapsed() < std::time::Duration::from_millis(500) {
+                        if let Some(msg) = net.try_receive_message() {
+                            if let ClientMessage::Pong(_) = msg {
+                                ack_received = true;
+                                println!("Received disconnect acknowledgment after {:?}", start_wait.elapsed());
+                            }
+                        }
+                        std::thread::sleep(std::time::Duration::from_millis(10));
+                    }
+                    
+                    if !ack_received {
+                        println!("Warning: Did not receive disconnect acknowledgment within timeout");
+                    }
                     
                     my_id = None;
                     all_players.clear();
                     interpolated_positions.clear();
                     prediction_errors.clear();
                     prediction.reset(); // Reset prediction state
+                    println!("Disconnect process completed in {:?}", start.elapsed());
                 }
                 is_connected = false;
             } else {
                 // Reconnect
+                println!("Starting reconnect process...");
+                let start = Instant::now();
+                
                 if let Some(prev_id) = previous_id {
                     // Send reconnect message with previous ID and position
                     let reconnect_pos = previous_position.unwrap_or(initial_position);
+                    println!("Sending reconnect message for ID {}...", prev_id);
                     net.send_reconnect(prev_id, reconnect_pos);
                     // Reset local position to match server
                     my_pos = reconnect_pos;
                     prediction.reset_with_position(reconnect_pos); // Reset prediction with server position
                 } else {
+                    println!("No previous ID, sending new connection request...");
                     net.send_connect();
                 }
                 is_connected = true;
+                println!("Reconnect process initiated in {:?}", start.elapsed());
             }
         }
         
