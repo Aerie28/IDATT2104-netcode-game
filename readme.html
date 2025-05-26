@@ -1,0 +1,115 @@
+<h1 id="netcode-game-implementation">Netcode Game Implementation</h1>
+<p>A real-time multiplayer game implementation exploring client-side
+prediction, server reconciliation, and entity interpolation in Rust.</p>
+<p><a href="https://github.com/yourusername/netcode-game/actions"><img
+src="https://github.com/yourusername/netcode-game/actions/workflows/ci.yml/badge.svg"
+alt="CI Status" /></a></p>
+<h2 id="introduction">Introduction</h2>
+<p>This project implements a client-server architecture for real-time
+multiplayer games, focusing on solving common networking challenges such
+as latency, packet loss, and state synchronization. The implementation
+is based on the techniques described in <a
+href="https://www.gabrielgambetta.com/client-side-prediction-live-demo.html">Gabriel
+Gambetta’s article</a>.</p>
+<h2 id="implemented-features">Implemented Features</h2>
+<ul>
+<li>Client-side prediction</li>
+<li>Server reconciliation</li>
+<li>Entity interpolation</li>
+<li>Network condition simulation</li>
+<li>Performance analysis tools</li>
+<li>Real-time visualization of prediction errors</li>
+<li>Configurable network parameters (delay, packet loss,
+timeout/disconnect and reconnect)</li>
+</ul>
+<h2 id="technical-details">Technical Details</h2>
+<h3 id="architecture">Architecture</h3>
+<ul>
+<li>Client-Server model using UDP</li>
+<li>State synchronization with server authority</li>
+<li>Client-side prediction for smooth gameplay</li>
+<li>Entity interpolation for other players</li>
+</ul>
+<h3 id="network-protocol">Network Protocol</h3>
+<ul>
+<li>Custom binary protocol using bincode</li>
+<li>Optimized for real-time updates</li>
+<li>Support for various message types (connect, input, state
+updates)</li>
+</ul>
+<h2 id="dependencies">Dependencies</h2>
+<ul>
+<li><code>tokio</code>: Async runtime for network operations</li>
+<li><code>macroquad</code>: Game engine and rendering</li>
+<li><code>bincode</code>: Binary serialization</li>
+<li><code>uuid</code>: Player identification</li>
+<li><code>serde</code>: Serialization framework</li>
+</ul>
+<h2 id="how-to-use-implement">How to use/ implement</h2>
+<p>NB: This project was developed on the OS Windows 11. The developers
+did not have access to a Linux or MacOS machine during development.
+However, based on previous experience and research the core
+functionality should be compatible across all platforms.</p>
+<h2 id="installation">Installation</h2>
+<ol type="1">
+<li><p>Install Rust: Follow the instructions at <a
+href="https://www.rust-lang.org/tools/install">rustup.rs</a> to install
+Rust. Using rustup is the recommended way to install Rust. It manages
+Rust versions and associated tools, making it easy to keep your Rust
+installation up to date.</p></li>
+<li><p>Clone the repository:</p></li>
+</ol>
+<div class="sourceCode" id="cb1"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a><span class="fu">git</span> clone https://github.com/yourusername/netcode-game.git</span>
+<span id="cb1-2"><a href="#cb1-2" aria-hidden="true" tabindex="-1"></a><span class="bu">cd</span> netcode-game</span></code></pre></div>
+<p>Navigate to the project directory and run the following commands</p>
+<ol start="3" type="1">
+<li>Build the project:</li>
+</ol>
+<div class="sourceCode" id="cb2"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> build <span class="at">--release</span></span></code></pre></div>
+<h2 id="usage">Usage</h2>
+<ol type="1">
+<li>Start the server:</li>
+</ol>
+<div class="sourceCode" id="cb3"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb3-1"><a href="#cb3-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> run <span class="at">--bin</span> server</span></code></pre></div>
+<ol start="2" type="1">
+<li>Start one or more clients:</li>
+</ol>
+<div class="sourceCode" id="cb4"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> run <span class="at">--bin</span> client</span></code></pre></div>
+<h3 id="controls">Controls</h3>
+<ul>
+<li>WASD: Move player</li>
+<li>R: Toggle connection</li>
+<li>T: Start performance testing</li>
+<li>V/B: Adjust delay</li>
+<li>N/M: Adjust packet loss</li>
+</ul>
+<h2 id="testing">Testing</h2>
+<p>Run the test suite:</p>
+<div class="sourceCode" id="cb5"><pre
+class="sourceCode bash"><code class="sourceCode bash"><span id="cb5-1"><a href="#cb5-1" aria-hidden="true" tabindex="-1"></a><span class="ex">cargo</span> test</span></code></pre></div>
+<p>Run performance tests: 1. Start the server 2. Start a client 3. Press
+‘T’ to begin performance testing 4. View results in the console</p>
+<h2 id="future-improvements">Future Improvements</h2>
+<ul>
+<li>Implement a Player Entity for better and easier entity
+management</li>
+<li>Advanced prediction algorithms</li>
+<li>Network statistics visualization</li>
+<li>Improve disconnection and reconnection handling. Eg. rejoining
+rejoining with the same player without losing the current state</li>
+<li>More comprehensive error handling</li>
+<li>Player interaction and lag compensation, eg. crash/collision
+handling</li>
+</ul>
+<h2 id="acknowledgments">Acknowledgments</h2>
+<ul>
+<li><a
+href="https://www.gabrielgambetta.com/client-side-prediction-live-demo.html">Gabriel
+Gambetta’s article on client-side prediction</a></li>
+<li><a href="https://gafferongames.com/">Gaffer on Games</a> for
+networking concepts</li>
+</ul>
