@@ -1,22 +1,17 @@
-name: Build and Test
+name: Build, Test, Docs, Coverage
 
 on:
   push:
-    branches: [ "dev" ]
+    branches: ["main", "dev"]
   pull_request:
-    branches: [ "dev" ]
+    branches: ["main", "dev"]
   workflow_dispatch:
-    inputs:
-      generate_docs:
-        description: "Generate Rust documentation?"
-        required: false
-        default: "false"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -44,15 +39,14 @@ jobs:
       - name: Build
         run: cargo build --verbose
 
-      - name: Run tests
+      - name: Run Tests
         run: cargo test --all-targets --verbose
 
-  generate-docs:
-    if: ${{ github.event.inputs.generate_docs == 'true' }}
+  coverage-and-docs:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-and-test
     permissions:
-      contents: write  # needed to push to gh-pages
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -62,8 +56,23 @@ jobs:
           toolchain: 1.87.0
           override: true
 
+      - name: Install llvm-tools-preview & cargo-llvm-cov
+        run: |
+          rustup component add llvm-tools-preview
+          cargo install cargo-llvm-cov
+
+      - name: Generate Code Coverage Report
+        run: cargo llvm-cov --all-features --workspace --html --output-path target/coverage
+
       - name: Generate Docs
         run: cargo doc --no-deps --verbose
+
+      - name: Copy README into docs
+        run: cp README.md target/doc/
+
+      - name: Create index.html for GitHub Pages
+        run: |
+          echo '<meta http-equiv="refresh" content="0; url=netcode_game/index.html">' > target/doc/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
