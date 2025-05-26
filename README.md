@@ -120,3 +120,6 @@ Run performance tests:
 
 - [Gabriel Gambetta's article on client-side prediction](https://www.gabrielgambetta.com/client-side-prediction-live-demo.html)
 - [netcode - Wikipedia](https://en.wikipedia.org/wiki/Netcode) for networking concepts
+
+### Use Artificial Intelligence
+Throughout this project AI such as ChatGPT and GitHub Copilot was used. It was used to explain concepts, give examples and debugging.
