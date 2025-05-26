@@ -7,7 +7,7 @@ on:
     branches: ["main", "dev"]
   workflow_dispatch:
     inputs:
-      generate_docs:
+      docs_and_coverage:
         description: "Generate Rust documentation?"
         required: false
         default: "false"
@@ -48,6 +48,7 @@ jobs:
         run: cargo test --all-targets --verbose
 
   docs-and-coverage:
+    if: github.event.inputs.docs_and_coverage == 'true'
     runs-on: ubuntu-latest
     needs: build-and-test
     permissions:
