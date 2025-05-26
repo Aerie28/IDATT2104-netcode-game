@@ -73,16 +73,30 @@ jobs:
       - name: Generate Docs
         run: cargo doc --no-deps --verbose
 
-      - name: Copy README into docs
-        run: cp README.md target/doc/
+      - name: Convert README.md to HTML
+        run: |
+          sudo apt-get update && sudo apt-get install -y pandoc
+          pandoc README.md -o target/doc/readme.html
 
       - name: Copy coverage report into docs
         run: cp -r target/llvm-cov/html target/doc/coverage
 
-      - name: Create index.html to redirect to crate docs
+      - name: Create landing index.html
         run: |
-          CRATE_NAME=$(basename $(pwd))
-          echo "<meta http-equiv=\"refresh\" content=\"0; url=${CRATE_NAME}/index.html\">" > target/doc/index.html
+          cat <<EOF > target/doc/index.html
+          <!DOCTYPE html>
+          <html lang="en">
+          <head><meta charset="UTF-8"/><title>Docs & Coverage</title></head>
+          <body>
+          <h1>Welcome to IDATT2104 Netcode Game</h1>
+          <ul>
+            <li><a href="./coverage/index.html">Coverage Report</a></li>
+            <li><a href="./netcode_game/index.html">Rust Documentation</a></li>
+            <li><a href="./readme.html">Project Overview (README)</a></li>
+          </ul>
+          </body>
+          </html>
+          EOF
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
