@@ -42,7 +42,7 @@ jobs:
       - name: Run Tests
         run: cargo test --all-targets --verbose
 
-  coverage-and-docs:
+  docs-and-coverage:
     runs-on: ubuntu-latest
     needs: build-and-test
     permissions:
@@ -56,13 +56,13 @@ jobs:
           toolchain: 1.87.0
           override: true
 
-      - name: Install llvm-tools-preview & cargo-llvm-cov
+      - name: Install cargo-llvm-cov and llvm-tools-preview
         run: |
           rustup component add llvm-tools-preview
           cargo install cargo-llvm-cov
 
-      - name: Generate Code Coverage Report
-        run: cargo llvm-cov --all-features --workspace --html --output-path target/coverage
+      - name: Generate Coverage Report
+        run: cargo llvm-cov --all-features --workspace --html
 
       - name: Generate Docs
         run: cargo doc --no-deps --verbose
@@ -70,9 +70,13 @@ jobs:
       - name: Copy README into docs
         run: cp README.md target/doc/
 
-      - name: Create index.html for GitHub Pages
+      - name: Copy coverage report into docs
+        run: cp -r target/llvm-cov/html target/doc/coverage
+
+      - name: Create index.html to redirect to crate docs
         run: |
-          echo '<meta http-equiv="refresh" content="0; url=netcode_game/index.html">' > target/doc/index.html
+          CRATE_NAME=$(basename $(pwd))
+          echo "<meta http-equiv=\"refresh\" content=\"0; url=${CRATE_NAME}/index.html\">" > target/doc/index.html
 
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
