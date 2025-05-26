@@ -11,6 +11,11 @@ A real-time multiplayer game implementation exploring client-side prediction, se
 
 This project implements a client-server architecture for real-time multiplayer games, focusing on solving common networking challenges such as latency, packet loss, and state synchronization. The implementation is based on the techniques described in [Gabriel Gambetta's article](https://www.gabrielgambetta.com/client-side-prediction-live-demo.html).
 
+### Contributors
+André Merkesdal, Aerie28
+
+Daniel Kvarsnes, DannX155
+
 ## Implemented Features
 
 - Client-side prediction
