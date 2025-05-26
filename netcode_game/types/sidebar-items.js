@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ClientMessage","Direction"],"struct":["Board","GameState","InterpolatedPosition","NetworkCondition","PlayerInput","Position","PositionSnapshot"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["amain","draw_player_with_color","main","start_next_test"]};

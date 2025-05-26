@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["BLUE","CYAN","GREEN","MAGENTA","ORANGE","PINK","PURPLE","RED","YELLOW"],"fn":["get_palette"]};

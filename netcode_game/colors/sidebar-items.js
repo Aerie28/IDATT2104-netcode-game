@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["bg_colors","player_colors"]};

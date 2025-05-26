@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["broadcast_snapshot_to_selected","main"]};
